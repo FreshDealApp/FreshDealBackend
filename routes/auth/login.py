@@ -35,8 +35,6 @@ def generate_verification_code(ip=None,login_type=None):
     return auth_code_generator.generate_verification_code(ip=ip, identifier=login_type) # True, code
 
 
-
-
 @login_bp.route("/login", methods=["POST"])
 def login():
     global LOGIN_SUCCESS
@@ -119,6 +117,9 @@ def login():
                     }
                 }), 400
             response = auth_code_generator.verify_code(identifier=login_type,provided_code=verification_code)
+            if response:
+                LOGIN_SUCCESS = response
+                #todo COMPLETE
         case _:
             return jsonify({"success": False, "message": "Invalid step"}), 400
 

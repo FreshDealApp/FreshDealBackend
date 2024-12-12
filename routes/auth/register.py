@@ -8,6 +8,8 @@ register_bp = Blueprint("register", __name__)
 @register_bp.route("/register", methods=["POST"])
 def register():
     data = request.json
+    name = data.get('name_surname'),
+
     email = data.get("email")
     phone_number = data.get("phone_number")
     password = data.get("password")
@@ -31,8 +33,22 @@ def register():
         # Additional checks for phone number format can be added here.
 
     hashed_password = generate_password_hash(password)
-    new_user = User(email=email, phone_number=phone_number, password=hashed_password)
+    # Map the incoming field 'name_surname' to 'name'
+    new_user = User(
+        name=data.get('name_surname'),  # Correct field mapping
+        email=data.get('email'),
+        phone_number=data.get('phone_number'),
+        password=hashed_password,
+        role='customer'
+    )
+
     db.session.add(new_user)
     db.session.commit()
 
-    return jsonify({"success": True, "message": "User registered successfully"}), 201  # 201 created
+    return jsonify({"message": "User registered successfully!"}), 201
+
+    # new_user = User(email=email, phone_number=phone_number, password=hashed_password)
+    # db.session.add(new_user)
+    # db.session.commit()
+    #
+    # return jsonify({"success": True, "message": "User registered successfully"}), 201  # 201 created

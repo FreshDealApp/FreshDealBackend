@@ -64,6 +64,13 @@ def create_app():
 
     init_app(app)  # Register the blueprints using the init_app function
 
+    @app.route('/recreate_tables', methods=['POST'])
+    def recreate_tables():
+        with app.app_context():
+            db.drop_all()
+            db.create_all()
+            return "All tables recreated!", 200
+
     ### Initialize CORS ###
     CORS(app, resources={r"/*": {"origins": "*"}})  # Allow all origins (adjust as needed)
 

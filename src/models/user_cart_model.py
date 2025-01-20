@@ -9,8 +9,11 @@ class UserCart(db.Model):
 
     user_id = db.Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     listing_id = db.Column(Integer, ForeignKey('listings.id', ondelete='CASCADE'), nullable=False)
-    restaurant_id = db.Column(Integer, ForeignKey('restaurants.id', ondelete='CASCADE'),
-                              nullable=False)  # New restaurant_id field
+    restaurant_id = db.Column(
+        Integer,
+        ForeignKey('restaurants.id', ondelete='NO ACTION'),  # or simply omit the ondelete argument
+        nullable=False
+    )
 
     count = db.Column(Integer, nullable=False, default=1)  # Quantity of the item in the cart
     added_at = db.Column(DateTime, nullable=False, default=func.now())  # Timestamp for when the item was added

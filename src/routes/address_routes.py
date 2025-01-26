@@ -1,5 +1,3 @@
-# routes/addresses.py
-
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.services.address_service import (
@@ -120,7 +118,6 @@ def create_address():
                       is_primary:
                         type: boolean
                         example: true
-                      # ... other address fields
         400:
           description: Validation error
           content:
@@ -141,6 +138,16 @@ def create_address():
       """
     try:
         data = request.get_json()
+
+        # Check if the required fields are present
+        required_fields = ["title", "longitude", "latitude", "street", "district", "province", "country", "postalCode"]
+        for field in required_fields:
+            if field not in data:
+                return jsonify({
+                    "success": False,
+                    "message": f"{field} is required"
+                }), 400
+
         user_id = get_jwt_identity()
         response, status = create_address_service(user_id, data)
         return jsonify(response), status
@@ -199,7 +206,6 @@ def list_addresses():
                      is_primary:
                        type: boolean
                        example: true
-                     # ... other address fields
          401:
            description: Unauthorized - Invalid or missing token
          404:
@@ -212,10 +218,17 @@ def list_addresses():
                    message:
                      type: string
                      example: "No addresses found for the user"
-       """
+      """
     try:
         user_id = get_jwt_identity()
         response, status = list_addresses_service(user_id)
+
+        # Return 404 if no addresses are found
+        if not response:
+            return jsonify({
+                "message": "No addresses found for the user"
+            }), 404
+
         return jsonify(response), status
     except Exception as e:
         print("An error occurred:", str(e))
@@ -229,15 +242,14 @@ def list_addresses():
 @jwt_required()
 def get_address(address_id):
     """
-        Update Address
+        Fetch an existing address
         ---
         tags:
           - Addresses
-        summary: Update an existing address
+        summary: Retrieve details of an address by ID
         description: |
-          Updates the details of an existing address.
-          Latitude and longitude cannot be modified after creation.
-          Setting an address as primary will automatically unset the primary status of other addresses.
+          Fetches details of an address using its ID.
+          The address must belong to the currently authenticated user.
 
           Current time (UTC): 2025-01-15 15:14:10
         security:
@@ -245,72 +257,27 @@ def get_address(address_id):
         parameters:
           - name: address_id
             in: path
-            description: ID of the address to update
+            description: ID of the address to fetch
             required: true
             schema:
               type: integer
               example: 1
-        requestBody:
-          required: true
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  title:
-                    type: string
-                    example: "Office"
-                  street:
-                    type: string
-                    example: "Bagdat Avenue"
-                  neighborhood:
-                    type: string
-                    example: "Kadikoy"
-                  district:
-                    type: string
-                    example: "Kadikoy"
-                  province:
-                    type: string
-                    example: "Istanbul"
-                  country:
-                    type: string
-                    example: "Turkey"
-                  postalCode:
-                    type: string
-                    example: "34710"
-                  apartmentNo:
-                    type: string
-                    example: "12"
-                  doorNo:
-                    type: string
-                    example: "5"
-                  is_primary:
-                    type: boolean
-                    description: Set this address as primary
-                    example: true
         responses:
           200:
-            description: Address updated successfully
+            description: Address details retrieved successfully
             content:
               application/json:
                 schema:
                   type: object
                   properties:
-                    success:
-                      type: boolean
-                      example: true
-                    message:
+                    id:
+                      type: integer
+                      example: 1
+                    title:
                       type: string
-                      example: "Address updated successfully!"
-                    address:
-                      type: object
-                      # ... address fields
-          401:
-            description: Unauthorized - Invalid or missing token
+                      example: "Home"
           404:
             description: Address not found
-          500:
-            description: Server error
         """
     try:
         user_id = get_jwt_identity()
@@ -350,7 +317,6 @@ def update_address(address_id):
             properties:
               title:
                 type: string
-              # Note: latitude and longitude will be ignored if provided.
               street:
                 type: string
               neighborhood:
@@ -407,8 +373,13 @@ def delete_address(address_id):
     ---
     tags:
       - Addresses
+    summary: Deletes an address by ID for the authenticated user
+    description: |
+      Removes an address from the list of addresses associated with the current user.
+
+      Current time (UTC): 2025-01-15 15:14:10
     security:
-      - jwt: []
+      - BearerAuth: []
     parameters:
       - name: address_id
         in: path
@@ -418,14 +389,18 @@ def delete_address(address_id):
           type: integer
     responses:
       200:
-        description: Address successfully deleted
+        description: Address deleted successfully
         content:
           application/json:
             schema:
               type: object
               properties:
+                success:
+                  type: boolean
+                  example: true
                 message:
                   type: string
+                  example: "Address deleted successfully"
       404:
         description: Address not found
     """

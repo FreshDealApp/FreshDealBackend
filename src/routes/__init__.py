@@ -9,11 +9,9 @@ from src.routes.listing_routes import listings_bp
 from src.routes.cart_routes import cart_bp
 from src.routes.search_routes import search_bp
 from src.routes.purchase_routes import purchase_bp
+from src.routes.notification_routes import notification_bp
 def init_app(app):
-    # Create a versioned API blueprint
     api_v1 = Blueprint('api_v1', __name__, url_prefix='/v1')
-
-    # Register all version 1 blueprints under the API v1 blueprint
     api_v1.register_blueprint(auth_bp)
     api_v1.register_blueprint(addresses_bp)
     api_v1.register_blueprint(restaurant_bp)
@@ -23,5 +21,5 @@ def init_app(app):
     api_v1.register_blueprint(search_bp)
     api_v1.register_blueprint(purchase_bp)
     api_v1.register_blueprint(report_bp)
-    # Register the versioned API blueprint with the main app
+    api_v1.register_blueprint(notification_bp)
     app.register_blueprint(api_v1)

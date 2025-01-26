@@ -16,6 +16,7 @@ from .listing_model import Listing
 from .purchase_model import Purchase
 from .restaurant_comments_model import RestaurantComment
 from .purchase_report import PurchaseReport
+from .device import UserDevice
 
 # Export all models
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     'UserCart',
     'Purchase',
     'RestaurantComment',
-    'PurchaseReport'
+    'PurchaseReport',
+    'UserDevice'
 ]

@@ -1,5 +1,5 @@
 from flask import jsonify
-from src.models import db, DiscountEarned, User, Purchase, Listing
+from src.models import db, DiscountEarned, User, Purchase, Listing, RestaurantBadgePoints
 from sqlalchemy import func
 from datetime import datetime
 
@@ -110,3 +110,57 @@ def get_single_user_rank(user_id):
         'total_discount': user_discount
     })
 
+
+def add_restaurant_badge_point(restaurant_id, badge_name):
+    valid_badges = ['fresh', 'fast_delivery', 'customer_friendly']
+    if badge_name not in valid_badges:
+        print(f"Error: '{badge_name}' is not a valid badge name.")
+        return
+
+    existing_badge = RestaurantBadgePoints.query.filter_by(restaurantID=restaurant_id).first()
+
+    if existing_badge:
+        if badge_name == 'fresh':
+            existing_badge.freshPoint += 1
+        elif badge_name == 'fast_delivery':
+            existing_badge.fastDeliveryPoint += 1
+        elif badge_name == 'customer_friendly':
+            existing_badge.customerFriendlyPoint += 1
+
+        db.session.commit()
+    else:
+        new_badge = RestaurantBadgePoints(
+            restaurantID=restaurant_id,
+            freshPoint=1 if badge_name == 'fresh' else 0,
+            fastDeliveryPoint=1 if badge_name == 'fast_delivery' else 0,
+            customerFriendlyPoint=1 if badge_name == 'customer_friendly' else 0
+        )
+
+        db.session.add(new_badge)
+        db.session.commit()
+
+
+def get_restaurant_badges(restaurant_id):
+    badge_data = RestaurantBadgePoints.query.filter_by(restaurantID=restaurant_id).first()
+
+    if not badge_data:
+        return []
+
+    badges = []
+
+    if badge_data.freshPoint > 100:
+        badges.append('super_fresh')
+    elif badge_data.freshPoint > 10:
+        badges.append('fresh')
+
+    if badge_data.fastDeliveryPoint > 100:
+        badges.append('super_fast_delivery')
+    elif badge_data.fastDeliveryPoint > 10:
+        badges.append('fast_delivery')
+
+    if badge_data.customerFriendlyPoint > 100:
+        badges.append('super_customer_friendly')
+    elif badge_data.customerFriendlyPoint > 10:
+        badges.append('customer_friendly')
+
+    return badges

@@ -12,6 +12,7 @@ from .user_favorites_model import UserFavorites
 from .user_cart_model import UserCart
 from .listing_model import Listing
 from .discount_earned import DiscountEarned
+from .restaurant_badge_points_model import RestaurantBadgePoints
 
 # Finally, import models that depend on multiple other models
 from .purchase_model import Purchase, PurchaseStatus
@@ -37,5 +38,6 @@ __all__ = [
     'DiscountEarned',
     'Achievement',
     'UserAchievement',
-    'AchievementType'
+    'AchievementType',
+    'RestaurantBadgePoints'
 ]

@@ -1,5 +1,6 @@
 from recommendation_system import get_recommendations_for_user
 from app import create_app
+# Testing recommendation system to see recommendated listing for each user by searching with their user_id
 
 # Create an app instance
 app = create_app()

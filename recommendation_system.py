@@ -2,11 +2,11 @@ import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 from src.models import db
 from sqlalchemy import text
-
+# Recommendation system Initiation
 
 def get_purchase_data():
-    # Fetching data directly from the 'purchases' table
-    query = text("SELECT user_id, listing_id FROM purchases WHERE status = 'COMPLETED'")  # Only completed purchases
+    # Bringing Completed data from the 'purchases' table
+    query = text("SELECT user_id, listing_id FROM purchases WHERE status = 'COMPLETED'")  
     result = db.session.execute(query).fetchall()
 
     # Converting the result into a DataFrame
@@ -15,7 +15,7 @@ def get_purchase_data():
 
 
 def collaborative_filtering(df):
-    # Create a pivot table of users and listings
+    # Create a pivot table of users based on their ids and listing id
     pivot_table = df.pivot_table(index='user_id', columns='listing_id', aggfunc='size', fill_value=0)
 
     # Compute the cosine similarity between users
@@ -35,7 +35,7 @@ def recommend_products(user_id, similarity_matrix, pivot_table):
     similar_users = list(pivot_table.index[similarity_scores > 0.5])  # Similarity threshold
     similar_users.remove(user_id)  # Remove the user itself
 
-    # Get products bought by similar users
+    # Get products bought by similar users (This is going to be updated)
     recommended_products = []
     for user in similar_users:
         user_products = pivot_table.loc[user][pivot_table.loc[user] > 0].index.tolist()

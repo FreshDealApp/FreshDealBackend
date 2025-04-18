@@ -38,7 +38,7 @@ def load_purchase_data():
             print("Warning: Purchase data loaded successfully but is empty.")
         else:
             print("Purchase data loaded successfully.")
-            print(df.head())  # Debug için ilk 5 satırı göster
+            print(df.head())
 
         return df
     except Exception as e:

@@ -14,7 +14,7 @@ from src.services.gamification_services import add_discount_point
 
 purchase_bp = Blueprint("purchase", __name__)
 
-
+##
 @purchase_bp.route("/purchase", methods=["POST"])
 @jwt_required()
 @swag_from({

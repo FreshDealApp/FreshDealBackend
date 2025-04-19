@@ -3,6 +3,7 @@ from flask import Blueprint
 from src.routes.analytics_routes import analytics_bp
 from src.routes.auth_routes import auth_bp
 from src.routes.address_routes import addresses_bp
+from src.routes.recommendation_system_routes import recommendation_bp
 from src.routes.report_routes import report_bp
 from src.routes.restaurant_routes import restaurant_bp
 from src.routes.static_routes import static_bp
@@ -15,7 +16,6 @@ from src.routes.notification_routes import notification_bp
 from src.routes.gamification_routes import gamification_bp
 from src.routes.achievement_routes import achievement_bp
 from src.routes.restaurant_badge_routes import restaurant_badge_bp
-from src.routes.comment_analysis_routes import comment_analysis_bp  # Add this line
 
 def init_app(app):
     api_v1 = Blueprint('api_v1', __name__, url_prefix='/v1')
@@ -34,6 +34,6 @@ def init_app(app):
     api_v1.register_blueprint(restaurant_badge_bp)
     api_v1.register_blueprint(static_bp)
     api_v1.register_blueprint(analytics_bp)
-    api_v1.register_blueprint(comment_analysis_bp)
+    api_v1.register_blueprint(recommendation_bp)
 
     app.register_blueprint(api_v1)

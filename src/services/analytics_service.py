@@ -29,7 +29,7 @@ class RestaurantAnalyticsService:
 
         regions = {}
         for purchase in monthly_purchases:
-            if purchase.is_delivery and purchase.delivery_district:
+            if purchase.delivery_district:
                 district = purchase.delivery_district
                 regions[district] = regions.get(district, 0) + 1
 
@@ -86,7 +86,7 @@ class RestaurantAnalyticsService:
 
         regions = {}
         for purchase in monthly_purchases:
-            if purchase.is_delivery and purchase.delivery_district:
+            if purchase.delivery_district:
                 district = purchase.delivery_district
                 regions[district] = regions.get(district, 0) + 1
 
@@ -122,5 +122,3 @@ class RestaurantAnalyticsService:
                 "restaurant_stats": restaurant_stats
             }
         }, 200
-
-    #

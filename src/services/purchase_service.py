@@ -4,7 +4,7 @@ import uuid
 from sqlalchemy import and_
 from werkzeug.utils import secure_filename
 
-from src.models import db, UserCart, Purchase, Restaurant
+from src.models import db, UserCart, Purchase, Restaurant, CustomerAddress
 
 from src.models.purchase_model import PurchaseStatus
 from src.services.notification_service import NotificationService
@@ -23,8 +23,16 @@ def create_purchase_order_service(user_id, data=None):
 
         is_delivery = data.get('is_delivery', False) if data else False
         notes = data.get('pickup_notes') if not is_delivery else data.get('delivery_notes')
-        delivery_address = data.get('delivery_address') if is_delivery else None
-        delivery_district = data.get('delivery_district') if is_delivery else None
+
+        # Get user's primary address or the specified address
+        address_id = data.get('address_id')
+        if address_id:
+            address = CustomerAddress.query.filter_by(id=address_id, user_id=user_id).first()
+        else:
+            address = CustomerAddress.query.filter_by(user_id=user_id, is_primary=True).first()
+
+        if not address:
+            return {"message": "No valid address found for the user"}, 400
 
         for item in cart_items:
             listing = item.listing
@@ -47,6 +55,15 @@ def create_purchase_order_service(user_id, data=None):
             delivery_fee = restaurant.deliveryFee if is_delivery else 0
             total_price = (price_to_use * item.count) + delivery_fee
 
+            # Create address string from components
+            address_str = f"{address.street}"
+            if address.apartmentNo:
+                address_str += f" No:{address.apartmentNo}"
+            if address.doorNo:
+                address_str += f" Door:{address.doorNo}"
+            if address.neighborhood:
+                address_str += f", {address.neighborhood}"
+
             try:
                 purchase = Purchase(
                     user_id=user_id,
@@ -56,8 +73,11 @@ def create_purchase_order_service(user_id, data=None):
                     total_price=total_price,
                     status=PurchaseStatus.PENDING,
                     is_delivery=is_delivery,
-                    delivery_address=delivery_address,
-                    delivery_district=delivery_district,
+                    address_title=address.title,
+                    delivery_address=address_str,
+                    delivery_district=address.district,
+                    delivery_province=address.province,
+                    delivery_country=address.country,
                     delivery_notes=notes
                 )
             except ValueError as e:
@@ -86,7 +106,6 @@ def create_purchase_order_service(user_id, data=None):
     except Exception as e:
         db.session.rollback()
         return {"message": "An error occurred", "error": str(e)}, 500
-
 def handle_restaurant_response_service(purchase_id, owner_id, action):
     """
     Second step: Restaurant accepts or rejects the order.

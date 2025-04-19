@@ -44,10 +44,16 @@ class Purchase(db.Model):
     purchase_date = db.Column(DateTime, nullable=False, default=datetime.utcnow)
     status = db.Column(db.Enum(PurchaseStatus), default=PurchaseStatus.PENDING, nullable=False)
     is_delivery = db.Column(db.Boolean, default=False, nullable=False)
+
+    # Address information (stored regardless of delivery type)
+    address_title = db.Column(db.String(80))
     delivery_address = db.Column(db.String(500))
-    delivery_district = db.Column(db.String(80))  # Added this field
-    completion_image_url = db.Column(db.String(255))
+    delivery_district = db.Column(db.String(80))
+    delivery_province = db.Column(db.String(80))
+    delivery_country = db.Column(db.String(80))
     delivery_notes = db.Column(db.String(500))
+
+    completion_image_url = db.Column(db.String(255))
 
     user = relationship('User', back_populates='purchases')
     listing = relationship('Listing', back_populates='purchases')
@@ -121,8 +127,11 @@ class Purchase(db.Model):
             "status": self.status.value,
             "is_active": self.is_active,
             "is_delivery": self.is_delivery,
+            "address_title": self.address_title,
             "delivery_address": self.delivery_address,
             "delivery_district": self.delivery_district,
+            "delivery_province": self.delivery_province,
+            "delivery_country": self.delivery_country,
             "delivery_notes": self.delivery_notes,
             "completion_image_url": self.completion_image_url,
             "restaurant_id": self.restaurant_id,

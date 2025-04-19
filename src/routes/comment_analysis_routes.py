@@ -1,109 +1,97 @@
 from flask import Blueprint, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.AI_services.comment_analysis_service import CommentAnalysisService
-from src.models import Restaurant
-import logging
+from src.services.recommendation_service import RecommendationSystemService
 
-# Configure logging
-logger = logging.getLogger(__name__)
+recommendation_bp = Blueprint("recommendation", __name__)
 
-comment_analysis_bp = Blueprint('comment_analysis', __name__)
-
-
-@comment_analysis_bp.route('/restaurants/<int:restaurant_id>/comment-analysis', methods=['GET'])
-@jwt_required()
-def analyze_restaurant_comments(restaurant_id):
+@recommendation_bp.route("/recommendation/<int:listing_id>", methods=["GET"])
+def get_recommendations(listing_id):
     """
-    Analyze comments for a specific restaurant from the last 3 months
+    Get KNN-based recommendations for a given listing.
+
+    Returns a list of similar listings based on past purchase behavior using collaborative filtering.
+
     ---
     tags:
-      - AI Services
+      - Recommendation
     parameters:
-      - name: restaurant_id
-        in: path
-        type: integer
+      - in: path
+        name: listing_id
         required: true
-        description: ID of the restaurant
-    security:
-      - BearerAuth: []
+        schema:
+          type: integer
+        description: ID of the listing to get recommendations for.
     responses:
       200:
-        description: Comment analysis results
+        description: Recommendation data returned successfully.
         content:
           application/json:
             schema:
               type: object
               properties:
-                restaurant_id:
-                  type: integer
-                  description: ID of the restaurant
-                restaurant_name:
-                  type: string
-                  description: Name of the restaurant
-                comment_count:
-                  type: integer
-                  description: Number of comments analyzed
-                analysis_date:
-                  type: string
-                  format: date-time
-                  description: Date and time of the analysis
-                good_aspects:
-                  type: array
-                  items:
-                    type: string
-                  description: Positive aspects mentioned in comments
-                bad_aspects:
-                  type: array
-                  items:
-                    type: string
-                  description: Negative aspects mentioned in comments
+                success:
+                  type: boolean
+                  example: true
+                data:
+                  type: object
+                  properties:
+                    listing:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          example: 1
+                        title:
+                          type: string
+                          example: "Cheese Toast"
+                    recommendations:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          listing_id:
+                            type: integer
+                            example: 2
+                          title:
+                            type: string
+                            example: "Börek Plate"
+                          restaurant_name:
+                            type: string
+                            example: "DoyDoy"
+                          similarity_score:
+                            type: number
+                            format: float
+                            example: 0.82
+                          pick_up_price:
+                            type: number
+                            example: 25.0
+                          delivery_price:
+                            type: number
+                            example: 32.5
       404:
-        description: Restaurant not found
+        description: Listing not found or insufficient data to make recommendations.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                message:
+                  type: string
+                  example: "Listing not found"
       500:
-        description: Internal server error
+        description: Internal server error during recommendation generation.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                success:
+                  type: boolean
+                  example: false
+                message:
+                  type: string
+                  example: "Error getting recommendations"
     """
-    try:
-        logger.info(f"Comment analysis requested for restaurant ID: {restaurant_id}")
-        user_id = get_jwt_identity()
-        logger.info(f"Request from user ID: {user_id}")
-
-        # Verify the restaurant exists
-        restaurant = Restaurant.query.get(restaurant_id)
-        if not restaurant:
-            logger.warning(f"Restaurant with ID {restaurant_id} not found")
-            return jsonify({"success": False, "message": f"Restaurant with ID {restaurant_id} not found"}), 404
-
-        # Initialize comment analyzer
-        analyzer = CommentAnalysisService()
-
-        # Analyze comments
-        logger.info(f"Starting comment analysis for restaurant: {restaurant.restaurantName}")
-        analysis_results = analyzer.analyze_comments(restaurant_id)
-
-        # Check if there was an error
-        if "error" in analysis_results:
-            error_msg = analysis_results["error"]
-            logger.error(f"Error in comment analysis: {error_msg}")
-
-            # Provide a more user-friendly message
-            if "400 Client Error" in error_msg:
-                return jsonify({
-                    "success": False,
-                    "message": "Error connecting to the analysis service. Please try again later.",
-                    "details": "There may be an issue with the API key or the service may be temporarily unavailable."
-                }), 500
-            else:
-                return jsonify({
-                    "success": False,
-                    "message": error_msg
-                }), 500
-
-        logger.info(f"Comment analysis completed successfully for restaurant ID: {restaurant_id}")
-        return jsonify(analysis_results), 200
-
-    except Exception as e:
-        logger.exception(f"Unexpected error in comment analysis endpoint: {str(e)}")
-        return jsonify({
-            "success": False,
-            "message": f"Error analyzing restaurant comments: {str(e)}"
-        }), 500
+    return RecommendationSystemService.get_recommendations_for_listing(listing_id)

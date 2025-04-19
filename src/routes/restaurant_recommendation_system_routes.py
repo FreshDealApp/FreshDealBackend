@@ -1,29 +1,77 @@
+# src/routes/restaurant_recommendation_system_routes.py
 from flask import Blueprint, jsonify
 from flask_jwt_extended import jwt_required
 from flasgger import swag_from
 from src.services.restaurant_recommendation_system_service import RestaurantRecommendationSystemService
 
-restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
+# Define the blueprint for recommendations
+recommendation_bp = Blueprint('recommendations', __name__)
 
-@restaurant_recommendation_bp.route('/api/restaurant-recommendations/<int:restaurant_id>', methods=['GET'])
+# Endpoint for initializing the recommendation system
+@recommendation_bp.route('/api/initialize_recommendation_system', methods=['GET'])
 @jwt_required()
 @swag_from({
     "tags": ["Restaurant Recommendations"],
-    "summary": "Get recommendations for a specific restaurant",
-    "description": (
-        "Retrieves restaurant-based listing recommendations using collaborative filtering. "
-        "Returns listings from other restaurants often co-purchased by users who purchased "
-        "from the given restaurant."
-    ),
+    "summary": "Initialize the Restaurant Recommendation System",
+    "description": "This endpoint initializes the recommendation system by processing all completed purchases. "
+                   "Once initialized, the system can be used to generate recommendations.",
+    "security": [{"BearerAuth": []}],
+    "responses": {
+        "200": {
+            "description": "Recommendation system initialized successfully",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "success": {"type": "boolean", "example": True},
+                            "message": {"type": "string", "example": "Recommendation system initialized"}
+                        }
+                    }
+                }
+            }
+        },
+        "500": {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "success": {"type": "boolean", "example": False},
+                            "message": {"type": "string", "example": "Error initializing recommendation system"}
+                        }
+                    }
+                }
+            }
+        }
+    }
+})
+def initialize_recommendation_system():
+    service = RestaurantRecommendationSystemService()
+    if service.initialize_model():
+        return jsonify({"success": True, "message": "Recommendation system initialized"}), 200
+    else:
+        return jsonify({"success": False, "message": "Error initializing recommendation system"}), 500
+
+# Endpoint for getting recommendations for a specific user
+@recommendation_bp.route('/api/recommendations/<int:user_id>', methods=['GET'])
+@jwt_required()
+@swag_from({
+    "tags": ["Restaurant Recommendations"],
+    "summary": "Get restaurant recommendations based on user's purchase history",
+    "description": "Retrieves restaurant recommendations based on the user's past purchase history. "
+                   "The recommendations are filtered by the category of restaurants in the user's purchase history. "
+                   "The original restaurant is excluded from the recommendations.",
     "security": [{"BearerAuth": []}],
     "parameters": [
         {
-            "name": "restaurant_id",
+            "name": "user_id",
             "in": "path",
             "schema": {"type": "integer"},
             "required": True,
-            "description": "ID of the restaurant to get recommendations for",
-            "example": 10
+            "description": "ID of the user to get recommendations for",
+            "example": 101
         }
     ],
     "responses": {
@@ -38,24 +86,15 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
                             "data": {
                                 "type": "object",
                                 "properties": {
-                                    "restaurant": {
-                                        "type": "object",
-                                        "properties": {
-                                            "id": {"type": "integer", "example": 10},
-                                            "name": {"type": "string", "example": "Sushi House"}
-                                        }
-                                    },
+                                    "user_id": {"type": "integer", "example": 101},
                                     "recommendations": {
                                         "type": "array",
                                         "items": {
                                             "type": "object",
                                             "properties": {
-                                                "listing_id": {"type": "integer", "example": 203},
-                                                "title": {"type": "string", "example": "Dragon Roll"},
-                                                "restaurant_name": {"type": "string", "example": "Tokyo Bites"},
-                                                "similarity_score": {"type": "number", "example": 0.76},
-                                                "pick_up_price": {"type": "number", "example": 18.99},
-                                                "delivery_price": {"type": "number", "example": 22.99}
+                                                "restaurant_id": {"type": "integer", "example": 202},
+                                                "restaurant_name": {"type": "string", "example": "Pizza Palace"},
+                                                "category": {"type": "string", "example": "Italian"}
                                             }
                                         }
                                     }
@@ -67,7 +106,7 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
             }
         },
         "401": {
-            "description": "Unauthorized",
+            "description": "Unauthorized - Missing or invalid authorization token",
             "content": {
                 "application/json": {
                     "schema": {
@@ -80,14 +119,14 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
             }
         },
         "404": {
-            "description": "Restaurant not found or no recommendations available",
+            "description": "User not found or no recommendations available",
             "content": {
                 "application/json": {
                     "schema": {
                         "type": "object",
                         "properties": {
                             "success": {"type": "boolean", "example": False},
-                            "message": {"type": "string", "example": "Restaurant not found"}
+                            "message": {"type": "string", "example": "User has no purchases"}
                         }
                     }
                 }
@@ -109,6 +148,6 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
         }
     }
 })
-def get_restaurant_recommendations(restaurant_id):
-    response, status = RestaurantRecommendationSystemService.get_recommendations_for_restaurant(restaurant_id)
+def get_recommendations_for_user(user_id):
+    response, status = RestaurantRecommendationSystemService.get_recommendations_for_user(user_id)
     return jsonify(response), status

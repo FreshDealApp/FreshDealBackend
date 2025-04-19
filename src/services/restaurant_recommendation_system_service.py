@@ -1,14 +1,14 @@
-from sqlalchemy import and_
+from datetime import datetime
+from sqlalchemy import func, and_
 from src.models import db, Purchase, Listing, Restaurant
 from sklearn.neighbors import NearestNeighbors
 import numpy as np
 import pandas as pd
 
-
 class RestaurantRecommendationSystemService:
     def __init__(self):
-        self.restaurant_matrix = None
-        self.restaurant_ids = None
+        self.purchase_matrix = None
+        self.listing_ids = None
         self.model = None
         self.is_initialized = False
         self.k_neighbors = 5
@@ -18,114 +18,109 @@ class RestaurantRecommendationSystemService:
             return True
 
         try:
+            # Get all completed purchases
             purchases = Purchase.query.filter_by(status='COMPLETED').all()
             if not purchases:
                 return False
 
-            data = []
+            # Create purchase data
+            purchase_data = []
             for purchase in purchases:
-                listing = Listing.query.get(purchase.listing_id)
-                if listing:
-                    data.append({
-                        'user_id': purchase.user_id,
-                        'restaurant_id': listing.restaurant_id,
-                        'quantity': purchase.quantity
-                    })
+                purchase_data.append({
+                    'user_id': purchase.user_id,
+                    'listing_id': purchase.listing_id,
+                    'quantity': purchase.quantity
+                })
 
-            df = pd.DataFrame(data)
+            # Convert to DataFrame
+            df = pd.DataFrame(purchase_data)
 
-            user_restaurant_matrix = pd.pivot_table(
+            # Create user-item matrix
+            user_listing_matrix = pd.pivot_table(
                 data=df,
-                index='restaurant_id',
+                index='listing_id',
                 columns='user_id',
                 values='quantity',
                 fill_value=0
             )
 
-            self.restaurant_matrix = user_restaurant_matrix.values
-            self.restaurant_ids = user_restaurant_matrix.index.tolist()
+            self.purchase_matrix = user_listing_matrix.values
+            self.listing_ids = user_listing_matrix.index.tolist()
 
+            # Create KNN model
             self.model = NearestNeighbors(
-                n_neighbors=min(self.k_neighbors, len(self.restaurant_ids)),
+                n_neighbors=min(self.k_neighbors, len(self.listing_ids)),
                 metric='cosine',
                 algorithm='brute'
             )
-            self.model.fit(self.restaurant_matrix)
+            self.model.fit(self.purchase_matrix)
             self.is_initialized = True
             return True
 
         except Exception as e:
-            print(f"Error initializing restaurant model: {e}")
+            print(f"Error initializing model: {e}")
             return False
 
     @staticmethod
-    def get_recommendations_for_restaurant(restaurant_id):
+    def get_recommendations_for_user(user_id):
         service = RestaurantRecommendationSystemService()
         if not service.initialize_model():
             return {
                 "success": False,
-                "message": "Could not initialize restaurant recommendation model"
-            }, 404
-
-        restaurant = Restaurant.query.get(restaurant_id)
-        if not restaurant:
-            return {
-                "success": False,
-                "message": "Restaurant not found"
+                "message": "Could not initialize recommendation model"
             }, 404
 
         try:
-            idx = service.restaurant_ids.index(restaurant_id)
-        except ValueError:
-            return {
-                "success": False,
-                "message": "Restaurant not found in training data"
-            }, 404
+            # Get the user's purchases
+            user_purchases = Purchase.query.filter_by(user_id=user_id).all()
+            if not user_purchases:
+                return {
+                    "success": False,
+                    "message": "User has no purchases"
+                }, 404
 
-        try:
-            distances, indices = service.model.kneighbors(
-                [service.restaurant_matrix[idx]],
-                n_neighbors=min(service.k_neighbors, len(service.restaurant_ids))
-            )
-            similarities = 1 - distances.flatten()
+            # Get the restaurant_id and category for each purchase
+            restaurant_ids = set()
+            for purchase in user_purchases:
+                listing = Listing.query.get(purchase.listing_id)
+                if listing:
+                    restaurant = Restaurant.query.get(listing.restaurant_id)
+                    if restaurant:
+                        restaurant_ids.add(restaurant.id)
+
+            if not restaurant_ids:
+                return {
+                    "success": False,
+                    "message": "No restaurant found for this user"
+                }, 404
 
             recommendations = []
-            for i, similarity in zip(indices.flatten(), similarities):
-                other_restaurant_id = service.restaurant_ids[i]
-                if other_restaurant_id == restaurant_id:
-                    continue
+            for restaurant_id in restaurant_ids:
+                restaurant = Restaurant.query.get(restaurant_id)
+                if restaurant:
+                    category = restaurant.category
+                    # Find other restaurants in the same category
+                    other_restaurants = Restaurant.query.filter(
+                        and_(Restaurant.category == category, Restaurant.id != restaurant_id)
+                    ).all()
 
-                other_restaurant = Restaurant.query.get(other_restaurant_id)
-                if not other_restaurant:
-                    continue
-
-                # Get one sample listing from this restaurant
-                sample_listing = Listing.query.filter_by(restaurant_id=other_restaurant_id).first()
-                if not sample_listing:
-                    continue
-
-                recommendations.append({
-                    "listing_id": sample_listing.id,
-                    "title": sample_listing.title,
-                    "restaurant_name": other_restaurant.restaurantName,
-                    "similarity_score": float(similarity),
-                    "pick_up_price": sample_listing.pick_up_price,
-                    "delivery_price": sample_listing.delivery_price
-                })
+                    for rec_restaurant in other_restaurants:
+                        recommendations.append({
+                            "restaurant_id": rec_restaurant.id,
+                            "restaurant_name": rec_restaurant.restaurantName,
+                            "category": rec_restaurant.category,
+                        })
 
             return {
                 "success": True,
                 "data": {
-                    "restaurant": {
-                        "id": restaurant.id,
-                        "name": restaurant.restaurantName
-                    },
+                    "user_id": user_id,
                     "recommendations": recommendations
                 }
             }, 200
 
         except Exception as e:
-            print(f"Error getting restaurant recommendations: {e}")
+            print(f"Error getting recommendations: {e}")
             return {
                 "success": False,
                 "message": "Error getting recommendations"

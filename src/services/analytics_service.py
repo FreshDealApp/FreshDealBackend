@@ -29,9 +29,8 @@ class RestaurantAnalyticsService:
 
         regions = {}
         for purchase in monthly_purchases:
-            if purchase.delivery_address:
-                parts = purchase.delivery_address.split(',')
-                district = parts[2].strip() if len(parts) > 2 else 'Unknown'
+            if purchase.is_delivery and purchase.delivery_district:
+                district = purchase.delivery_district
                 regions[district] = regions.get(district, 0) + 1
 
         restaurant_stats = {}
@@ -87,9 +86,8 @@ class RestaurantAnalyticsService:
 
         regions = {}
         for purchase in monthly_purchases:
-            if purchase.delivery_address:
-                parts = purchase.delivery_address.split(',')
-                district = parts[2].strip() if len(parts) > 2 else 'Unknown'
+            if purchase.is_delivery and purchase.delivery_district:
+                district = purchase.delivery_district
                 regions[district] = regions.get(district, 0) + 1
 
         comments = RestaurantComment.query.filter_by(restaurant_id=restaurant_id) \
@@ -124,3 +122,5 @@ class RestaurantAnalyticsService:
                 "restaurant_stats": restaurant_stats
             }
         }, 200
+
+    #

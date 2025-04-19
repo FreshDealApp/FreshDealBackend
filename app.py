@@ -32,7 +32,7 @@ def create_app():
         f"{required_env_vars['DB_SERVER']}/"
         f"{required_env_vars['DB_NAME']}?driver={required_env_vars['DB_DRIVER']}"
     )
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456789@127.0.0.1:3306/freshdeallocal'
+   # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456789@127.0.0.1:3306/freshdeallocal'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
     #

@@ -102,7 +102,12 @@ class RestaurantRecommendationSystemService:
                     rec_restaurant_id = service.restaurant_ids[idx]
                     if rec_restaurant_id != restaurant_id:
                         rec_restaurant = Restaurant.query.get(rec_restaurant_id)
-                        if rec_restaurant:
+                        base_restaurant = Restaurant.query.get(restaurant_id)
+                        if rec_restaurant and base_restaurant:
+                            # Sadece aynı kategoride olanları al
+                            if rec_restaurant.category != base_restaurant.category:
+                                continue
+
                             recommendation = {
                                 "restaurant_id": rec_restaurant.id,
                                 "restaurant_name": rec_restaurant.restaurantName,
@@ -110,9 +115,9 @@ class RestaurantRecommendationSystemService:
                                 "similarity_score": float(similarity),
                                 "address": f"{rec_restaurant.latitude}, {rec_restaurant.longitude}",
                                 "based_on": {
-                                    "restaurant_id": restaurant_id,
-                                    "restaurant_name": Restaurant.query.get(restaurant_id).restaurantName,
-                                    "category": Restaurant.query.get(restaurant_id).category
+                                    "restaurant_id": base_restaurant.id,
+                                    "restaurant_name": base_restaurant.restaurantName,
+                                    "category": base_restaurant.category
                                 }
                             }
 

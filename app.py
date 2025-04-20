@@ -80,7 +80,7 @@ def create_app():
         "servers": [
             {"url": "https://freshdealbackend.azurewebsites.net/",
              "description": "Production server"},
-            {"url": "http://localhost:8000", "description": "Local development server"},
+            {"url": "http://localhost:5000", "description": "Local development server"},
 
 
         ],
@@ -104,8 +104,8 @@ def create_app():
             {
                 "endpoint": 'apispec_1',
                 "route": '/apispec_1.json',
-                "rule_filter": lambda rule: True,  # Include all API routes
-                "model_filter": lambda tag: True,  # Include all tags
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
             }
         ],
         "static_url_path": "/flasgger_static",

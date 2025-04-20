@@ -16,6 +16,7 @@ from src.routes.notification_routes import notification_bp
 from src.routes.gamification_routes import gamification_bp
 from src.routes.achievement_routes import achievement_bp
 from src.routes.restaurant_badge_routes import restaurant_badge_bp
+from src.routes.restaurant_recommendation_system_routes import restaurant_recommendation_bp
 
 def init_app(app):
     api_v1 = Blueprint('api_v1', __name__, url_prefix='/v1')
@@ -35,5 +36,6 @@ def init_app(app):
     api_v1.register_blueprint(static_bp)
     api_v1.register_blueprint(analytics_bp)
     api_v1.register_blueprint(recommendation_bp)
+    api_v1.register_blueprint(restaurant_recommendation_bp)
 
     app.register_blueprint(api_v1)

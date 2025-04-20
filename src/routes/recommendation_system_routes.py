@@ -24,7 +24,7 @@ recommendation_bp = Blueprint('recommendations', __name__)
             "schema": {"type": "integer"},
             "required": True,
             "description": "ID of the listing to get recommendations for",
-            "example": 101
+            "example": 51
         }
     ],
     "responses": {

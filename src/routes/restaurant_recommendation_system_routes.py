@@ -23,7 +23,7 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
             "schema": {"type": "integer"},
             "required": True,
             "description": "ID of the user to get recommendations for",
-            "example": 101
+            "example": 51
         }
     ],
     "responses": {
@@ -38,7 +38,7 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
                             "data": {
                                 "type": "object",
                                 "properties": {
-                                    "user_id": {"type": "integer", "example": 101},
+                                    "user_id": {"type": "integer", "example": 51},
                                     "restaurants_from_history": {
                                         "type": "array",
                                         "items": {"type": "integer"},

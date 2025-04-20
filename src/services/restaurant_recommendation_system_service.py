@@ -19,7 +19,7 @@ class RestaurantRecommendationSystemService:
             return True
 
         try:
-            # Tüm completed satın almaları çek
+            # Only completed purchases
             purchases = Purchase.query.filter_by(status='COMPLETED').all()
             if not purchases:
                 return False
@@ -34,13 +34,13 @@ class RestaurantRecommendationSystemService:
             if df.empty:
                 return False
 
-            # Kullanıcı-restaurant matrisi (binary interaction)
+            # User-restaurant binary interaction
             user_restaurant_matrix = df.pivot_table(index='restaurant_id', columns='user_id', aggfunc=lambda x: 1, fill_value=0)
 
             self.restaurant_matrix = user_restaurant_matrix.values
             self.restaurant_ids = user_restaurant_matrix.index.tolist()
 
-            # KNN modelini oluştur
+            # KNN model
             self.model = NearestNeighbors(
                 n_neighbors=min(self.k_neighbors + 1, len(self.restaurant_ids)),
                 metric='cosine',
@@ -104,7 +104,6 @@ class RestaurantRecommendationSystemService:
                         rec_restaurant = Restaurant.query.get(rec_restaurant_id)
                         base_restaurant = Restaurant.query.get(restaurant_id)
                         if rec_restaurant and base_restaurant:
-                            # Sadece aynı kategoride olanları al
                             if rec_restaurant.category != base_restaurant.category:
                                 continue
 

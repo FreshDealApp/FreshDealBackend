@@ -49,17 +49,17 @@ restaurant_recommendation_bp = Blueprint('restaurant_recommendations', __name__)
                                         "items": {
                                             "type": "object",
                                             "properties": {
-                                                "restaurant_id": {"type": "integer", "example": 201},
-                                                "restaurant_name": {"type": "string", "example": "Pizza Palace"},
-                                                "category": {"type": "string", "example": "Italian"},
-                                                "similarity_score": {"type": "number", "example": 0.85},
-                                                "address": {"type": "string", "example": "123 Main St"},
+                                                "restaurant_id": {"type": "integer", "example": 30},
+                                                "restaurant_name": {"type": "string", "example": "Yıldız Pastanesi"},
+                                                "category": {"type": "string", "example": "Tatlı"},
+                                                "similarity_score": {"type": "number", "example": 0.37},
+                                                "address": {"type": "string", "example": "27.142800, 38.423700"},
                                                 "based_on": {
                                                     "type": "object",
                                                     "properties": {
-                                                        "restaurant_id": {"type": "integer", "example": 1},
-                                                        "restaurant_name": {"type": "string", "example": "Pasta Paradise"},
-                                                        "category": {"type": "string", "example": "Italian"}
+                                                        "restaurant_id": {"type": "integer", "example": 48},
+                                                        "restaurant_name": {"type": "string", "example": "Beyaz Fırın"},
+                                                        "category": {"type": "string", "example": "Fırın & Pastane"}
                                                     }
                                                 }
                                             }

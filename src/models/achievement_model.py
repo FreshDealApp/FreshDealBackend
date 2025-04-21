@@ -1,7 +1,7 @@
 from . import db
 from sqlalchemy import Integer, String, DateTime, Boolean, ForeignKey, Enum
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, UTC
 import enum
 
 
@@ -20,10 +20,9 @@ class Achievement(db.Model):
     description = db.Column(String(500), nullable=False)
     badge_image_url = db.Column(String(255), nullable=True)
     achievement_type = db.Column(Enum(AchievementType), nullable=False)
-    threshold = db.Column(Integer, nullable=True)  # For purchase count achievements
+    threshold = db.Column(Integer, nullable=True)
     is_active = db.Column(Boolean, default=True, nullable=False)
 
-    # Relationships
     user_achievements = relationship('UserAchievement', back_populates='achievement')
 
     def __init__(self, name, description, achievement_type, badge_image_url=None, threshold=None):
@@ -41,9 +40,8 @@ class UserAchievement(db.Model):
     id = db.Column(Integer, primary_key=True, autoincrement=True)
     user_id = db.Column(Integer, db.ForeignKey('users.id'), nullable=False)
     achievement_id = db.Column(Integer, db.ForeignKey('achievements.id'), nullable=False)
-    earned_at = db.Column(DateTime, nullable=False, default=datetime.utcnow)
+    earned_at = db.Column(DateTime, nullable=False, default=lambda: datetime.now(UTC))
 
-    # Relationships
     achievement = relationship('Achievement', back_populates='user_achievements')
     user = relationship('User', back_populates='achievements')
 

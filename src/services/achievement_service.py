@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from src.models import db, UserAchievement, Achievement, AchievementType, Purchase, PurchaseStatus
 
 
@@ -161,10 +161,10 @@ class AchievementService:
 
     @staticmethod
     def _check_weekly_purchase_achievement(user_id):
-        """Check and award weekly purchase achievement (5 purchases in a week)"""
+
         newly_earned = []
 
-        # Get the weekly purchase achievement
+
         weekly_achievement = Achievement.query.filter_by(
             achievement_type=AchievementType.WEEKLY_PURCHASE
         ).first()
@@ -172,18 +172,17 @@ class AchievementService:
         if not weekly_achievement:
             return newly_earned
 
-        # Check if user already has this achievement
+
         existing = UserAchievement.query.filter_by(
             user_id=user_id,
             achievement_id=weekly_achievement.id
         ).first()
 
-        # Only check if they don't have it yet
-        if not existing:
-            # Calculate date range (one week ago until now)
-            one_week_ago = datetime.utcnow() - timedelta(days=7)
 
-            # Count purchases in the last week
+        if not existing:
+            one_week_ago = datetime.now(UTC) - timedelta(days=7)
+
+
             weekly_purchase_count = Purchase.query.filter(
                 Purchase.user_id == user_id,
                 Purchase.status == PurchaseStatus.COMPLETED,
@@ -191,7 +190,7 @@ class AchievementService:
             ).count()
 
             if weekly_purchase_count >= weekly_achievement.threshold:
-                # Award the achievement
+
                 user_achievement = UserAchievement(
                     user_id=user_id,
                     achievement_id=weekly_achievement.id

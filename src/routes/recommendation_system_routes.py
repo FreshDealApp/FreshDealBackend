@@ -1,10 +1,13 @@
-
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from flasgger import swag_from
 from src.services.recommendation_system_service import RecommendationSystemService
+import json
+import traceback
+import sys
 
 recommendation_bp = Blueprint('recommendations', __name__)
+
 
 @recommendation_bp.route('/api/recommendations/<int:listing_id>', methods=['GET'])
 @jwt_required()
@@ -12,9 +15,9 @@ recommendation_bp = Blueprint('recommendations', __name__)
     "tags": ["Recommendations"],
     "summary": "Get recommendations for a specific listing",
     "description": (
-        "Retrieves personalized recommendations for a given listing based on purchase patterns "
-        "using a KNN-based collaborative filtering approach. The recommendations are sorted "
-        "by similarity score."
+            "Retrieves personalized recommendations for a given listing based on purchase patterns "
+            "using a KNN-based collaborative filtering approach. The recommendations are sorted "
+            "by similarity score."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -24,7 +27,7 @@ recommendation_bp = Blueprint('recommendations', __name__)
             "schema": {"type": "integer"},
             "required": True,
             "description": "ID of the listing to get recommendations for",
-            "example": 101
+            "example": 51
         }
     ],
     "responses": {
@@ -111,5 +114,27 @@ recommendation_bp = Blueprint('recommendations', __name__)
     }
 })
 def get_recommendations_for_listing(listing_id):
-    response, status = RecommendationSystemService.get_recommendations_for_listing(listing_id)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        response, status = RecommendationSystemService.get_recommendations_for_listing(listing_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching recommendations",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

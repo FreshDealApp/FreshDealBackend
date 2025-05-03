@@ -1,8 +1,13 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
-from src.services.restaurant_badge_services import get_restaurant_badges, add_restaurant_badge_point, VALID_BADGES, get_restaurant_badge_analytics
+from src.services.restaurant_badge_services import get_restaurant_badges, add_restaurant_badge_point, VALID_BADGES, \
+    get_restaurant_badge_analytics
+import json
+import traceback
+import sys
 
 restaurant_badge_bp = Blueprint("restaurant_badge", __name__)
+
 
 @restaurant_badge_bp.route("/restaurants/<int:restaurant_id>/badges", methods=["GET"])
 def get_badges(restaurant_id):
@@ -76,17 +81,35 @@ def get_badges(restaurant_id):
               type: string
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         badge_points = get_restaurant_badges(restaurant_id)
-        return jsonify({
+        response = {
             "restaurant_id": restaurant_id,
             "badge_points": badge_points
-        }), 200
+        }
+
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while retrieving badges",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @restaurant_badge_bp.route("/restaurants/<int:restaurant_id>/badge-analytics", methods=["GET"])
 def get_badge_analytics(restaurant_id):
@@ -177,15 +200,32 @@ def get_badge_analytics(restaurant_id):
               type: string
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         analytics = get_restaurant_badge_analytics(restaurant_id)
-        return jsonify({
+        response = {
             "success": True,
             "restaurant_id": restaurant_id,
             "badge_analytics": analytics
-        }), 200
+        }
+
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while retrieving badge analytics",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

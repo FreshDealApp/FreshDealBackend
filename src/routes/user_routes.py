@@ -1,6 +1,9 @@
 import re
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
+import json
+import traceback
+import sys
 
 from src.services.purchase_service import get_user_active_orders_service
 from src.services.user_service import (
@@ -15,12 +18,14 @@ from src.services.user_service import (
 
 user_bp = Blueprint("user", __name__)
 
+
 def is_valid_email(email):
     """
     Validates an email address using a regex pattern.
     """
     email_regex = r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$'
     return re.match(email_regex, email) is not None
+
 
 # ----------------------------
 # User Resource
@@ -98,21 +103,37 @@ def get_user():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         data, error = fetch_user_data(user_id)
         if error:
             status_code = 404 if error == "User not found" else 400
-            return jsonify({"message": error}), status_code
+            error_response = {"message": error}
+            print(json.dumps({"error_response": error_response, "status": status_code}, indent=2))
+            return jsonify(error_response), status_code
 
+        print(json.dumps({"response": data, "status": 200}, indent=2))
         return jsonify(data), 200
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @user_bp.route("/user/password", methods=["PUT"])
@@ -158,27 +179,47 @@ def update_password():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         old_password = data.get("old_password")
         new_password = data.get("new_password")
 
         if not old_password or not new_password:
-            return jsonify({"message": "Old and new passwords are required"}), 400
+            error_response = {"message": "Old and new passwords are required"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         user_id = get_jwt_identity()
         success, message = change_password(user_id, old_password, new_password)
         if not success:
-            return jsonify({"message": message}), 400
+            error_response = {"message": message}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
-        return jsonify({"message": message}), 200
+        response = {"message": message}
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @user_bp.route("/user/username", methods=["PUT"])
@@ -222,26 +263,46 @@ def update_username():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         new_username = data.get("username")
 
         if not new_username:
-            return jsonify({"message": "New username is required"}), 400
+            error_response = {"message": "New username is required"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         user_id = get_jwt_identity()
         success, message = change_username(user_id, new_username)
         if not success:
-            return jsonify({"message": message}), 404
+            error_response = {"message": message}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
-        return jsonify({"message": message}), 200
+        response = {"message": message}
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @user_bp.route("/user/email", methods=["PUT"])
@@ -287,33 +348,58 @@ def update_email():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         old_email = data.get("old_email")
         new_email = data.get("new_email")
 
         if not old_email or not new_email:
-            return jsonify({"message": "Old and new emails are required"}), 400
+            error_response = {"message": "Old and new emails are required"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         # Validate email formats
         if not is_valid_email(old_email):
-            return jsonify({"message": "Invalid old email format"}), 400
+            error_response = {"message": "Invalid old email format"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
         if not is_valid_email(new_email):
-            return jsonify({"message": "Invalid new email format"}), 400
+            error_response = {"message": "Invalid new email format"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         user_id = get_jwt_identity()
         success, message = change_email(user_id, old_email, new_email)
         if not success:
-            return jsonify({"message": message}), 400
+            error_response = {"message": message}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
-        return jsonify({"message": message}), 200
+        response = {"message": message}
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 # ----------------------------
 # Favorites Sub-Resource
@@ -345,16 +431,34 @@ def get_favorites_route():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         favorites = get_favorites(user_id)
-        return jsonify({"favorites": favorites}), 200
+
+        response = {"favorites": favorites}
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @user_bp.route("/user/favorites", methods=["POST"])
 @jwt_required()
@@ -395,26 +499,47 @@ def add_favorite_route():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         restaurant_id = data.get("restaurant_id")
 
         if not restaurant_id:
-            return jsonify({"message": "Restaurant ID is required"}), 400
+            error_response = {"message": "Restaurant ID is required"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         user_id = get_jwt_identity()
         success, message = add_favorite(user_id, restaurant_id)
         if not success:
-            return jsonify({"message": message}), 400
+            error_response = {"message": message}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
-        return jsonify({"message": message}), 201
+        response = {"message": message}
+        print(json.dumps({"response": response, "status": 201}, indent=2))
+        return jsonify(response), 201
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @user_bp.route("/user/favorites", methods=["DELETE"])
 @jwt_required()
@@ -455,32 +580,78 @@ def remove_favorite_route():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         restaurant_id = data.get("restaurant_id")
 
         if not restaurant_id:
-            return jsonify({"message": "Restaurant ID is required"}), 400
+            error_response = {"message": "Restaurant ID is required"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         user_id = get_jwt_identity()
         success, message = remove_favorite(user_id, restaurant_id)
         if not success:
-            return jsonify({"message": message}), 404
+            error_response = {"message": message}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
-        return jsonify({"message": message}), 200
+        response = {"message": message}
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @user_bp.route('/users/active-orders', methods=['GET'])
 @jwt_required()  # Assuming you're using Flask-JWT-Extended
 def get_user_active_orders():
-    current_user_id = get_jwt_identity()  # Get the current user's ID
-    return get_user_active_orders_service(current_user_id)
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        current_user_id = get_jwt_identity()  # Get the current user's ID
+        response, status = get_user_active_orders_service(current_user_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @user_bp.route("/user/recent-restaurants", methods=["GET"])
 @jwt_required()
@@ -529,12 +700,28 @@ def get_recent_restaurants():
         description: Internal server error
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = get_user_recent_restaurants_service(user_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

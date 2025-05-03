@@ -1,6 +1,8 @@
-# routes/restaurant_routes.py
 import os
 from datetime import datetime, UTC
+import json
+import traceback
+import sys
 
 from flask import Blueprint, request, jsonify, url_for, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
@@ -122,19 +124,39 @@ def create_restaurant():
         description: Owner not found.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "form": dict(request.form)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         owner_id = get_jwt_identity()
         # Optionally, verify owner exists and has role "owner"
         owner = User.query.get(owner_id)
         if not owner:
-            return jsonify({"success": False, "message": "Owner not found"}), 404
+            error_response = {"success": False, "message": "Owner not found"}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
+
         if owner.role != "owner":
-            return jsonify({"success": False, "message": "Only owners can add a restaurant"}), 403
+            error_response = {"success": False, "message": "Only owners can add a restaurant"}
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
 
         response, status = create_restaurant_service(owner_id, request.form, request.files, url_for)
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
 
     except Exception as e:
-        return jsonify({"success": False, "message": "An error occurred", "error": str(e)}), 500
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @restaurant_bp.route("/restaurants", methods=["GET"])
@@ -163,11 +185,26 @@ def get_restaurants():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         owner_id = get_jwt_identity()
         response, status = get_restaurants_service(owner_id)
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({"success": False, "message": "An error occurred", "error": str(e)}), 500
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @restaurant_bp.route("/restaurants/<int:restaurant_id>", methods=["GET"])
@@ -193,10 +230,25 @@ def get_restaurant(restaurant_id):
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         response, status = get_restaurant_service(restaurant_id)
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({"success": False, "message": "An error occurred", "error": str(e)}), 500
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @restaurant_bp.route("/restaurants/<int:restaurant_id>", methods=["DELETE"])
@@ -229,26 +281,40 @@ def delete_restaurant(restaurant_id):
     current_time = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
     current_user = get_jwt_identity()
 
-    print(f"[{current_time}] User {current_user} attempting to delete restaurant {restaurant_id}")
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "timestamp": current_time,
+            "user_id": current_user
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        print(f"[{current_time}] User {current_user} attempting to delete restaurant {restaurant_id}")
+
         # Verify user exists and is an owner
         owner = User.query.get(current_user)
         if not owner:
             print(f"[{current_time}] User {current_user} not found")
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "Owner not found",
                 "timestamp": current_time
-            }), 404
+            }
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
         if owner.role != "owner":
             print(f"[{current_time}] User {current_user} attempted to delete restaurant but is not an owner")
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "Only owners can delete restaurants",
                 "timestamp": current_time
-            }), 403
+            }
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
 
         # Call the service layer
         response, status = delete_restaurant_service(restaurant_id, current_user)
@@ -263,18 +329,25 @@ def delete_restaurant(restaurant_id):
         if isinstance(response, dict) and "timestamp" not in response:
             response["timestamp"] = current_time
 
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
 
     except Exception as e:
         error_message = f"Error during restaurant deletion: {str(e)}"
         print(f"[{current_time}] User {current_user}: {error_message}")
 
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred during restaurant deletion",
             "error": str(e),
             "timestamp": current_time
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @restaurant_bp.route("/uploads/<filename>", methods=['GET'])
 def get_uploaded_file(filename):
@@ -297,10 +370,30 @@ def get_uploaded_file(filename):
         description: File not found.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         filename = secure_filename(filename)
-        return send_from_directory(UPLOAD_FOLDER, filename)
+        response = send_from_directory(UPLOAD_FOLDER, filename)
+        print(json.dumps({"response": "File served successfully", "filename": filename}, indent=2))
+        return response
     except FileNotFoundError:
-        return jsonify({"success": False, "message": "File not found"}), 404
+        error_response = {"success": False, "message": "File not found"}
+        print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+        return jsonify(error_response), 404
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @restaurant_bp.route("/restaurants/proximity", methods=["POST"])
@@ -349,14 +442,31 @@ def get_restaurants_proximity():
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "json": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         user_lat = data.get('latitude')
         user_lon = data.get('longitude')
         radius = data.get('radius', 10)
         response, status = get_restaurants_proximity_service(user_lat, user_lon, radius)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({"success": False, "message": "An error occurred", "error": str(e)}), 500
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @restaurant_bp.route("/restaurants/<int:restaurant_id>/comments", methods=["POST"])
 @jwt_required()
@@ -513,16 +623,33 @@ def add_comment(restaurant_id):
                   example: "Detailed error message"
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "json": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         data = request.get_json()
         response, status = add_comment_service(restaurant_id, user_id, data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @restaurant_bp.route("/restaurants/<int:restaurant_id>/comments", methods=["GET"])
 def get_restaurant_comments(restaurant_id):
@@ -616,6 +743,14 @@ def get_restaurant_comments(restaurant_id):
                   type: string
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         comments = RestaurantComment.query.filter_by(restaurant_id=restaurant_id).all()
         comments_data = []
 
@@ -632,17 +767,27 @@ def get_restaurant_comments(restaurant_id):
             }
             comments_data.append(comment_data)
 
-        return jsonify({
+        response = {
             "success": True,
             "restaurant_id": restaurant_id,
             "comments": comments_data
-        }), 200
+        }
+
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while retrieving comments",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @restaurant_bp.route("/restaurants/<int:restaurant_id>", methods=["PUT"])
 @jwt_required()
@@ -733,14 +878,27 @@ def update_restaurant(restaurant_id):
         description: An error occurred.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "form": dict(request.form)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         owner_id = get_jwt_identity()
 
         # (Optionally, verify the user is an owner)
         owner = User.query.get(owner_id)
         if not owner:
-            return jsonify({"success": False, "message": "Owner not found"}), 404
+            error_response = {"success": False, "message": "Owner not found"}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
+
         if owner.role != "owner":
-            return jsonify({"success": False, "message": "Only owners can update a restaurant"}), 403
+            error_response = {"success": False, "message": "Only owners can update a restaurant"}
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
 
         from src.services.restaurant_service import update_restaurant_service
         response, status = update_restaurant_service(
@@ -750,7 +908,15 @@ def update_restaurant(restaurant_id):
             request.files,
             url_for
         )
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
 
     except Exception as e:
-        return jsonify({"success": False, "message": "An error occurred", "error": str(e)}), 500
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

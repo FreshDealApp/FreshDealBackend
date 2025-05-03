@@ -4,8 +4,12 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.services.restaurant_punishment_service import RestaurantPunishmentService
 from src.models import User
 from datetime import datetime, UTC
+import json
+import traceback
+import sys
 
 restaurant_punishment_bp = Blueprint('restaurant_punishment', __name__)
+
 
 @restaurant_punishment_bp.route('/restaurants/<int:restaurant_id>/punish', methods=['POST'])
 @jwt_required()
@@ -66,31 +70,61 @@ restaurant_punishment_bp = Blueprint('restaurant_punishment', __name__)
     'security': [{'Bearer': []}]
 })
 def punish_restaurant(restaurant_id):
-    current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "body": request.get_json(),
+            "restaurant_id": restaurant_id
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
-    if not user or user.role != 'support':
-        return jsonify({
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.role != 'support':
+            error_response = {
+                "success": False,
+                "message": "Only support team members can issue punishments",
+                "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+            }
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
+
+        data = request.get_json()
+        if not data:
+            error_response = {
+                "success": False,
+                "message": "No data provided",
+                "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
+
+        response, status_code = RestaurantPunishmentService.issue_punishment(
+            restaurant_id,
+            data,
+            current_user_id
+        )
+        response["timestamp"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        print(json.dumps({"response": response, "status": status_code}, indent=2))
+        return jsonify(response), status_code
+
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
-            "message": "Only support team members can issue punishments",
+            "message": "An error occurred while issuing punishment",
+            "error": str(e),
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        }), 403
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            "success": False,
-            "message": "No data provided",
-            "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        }), 400
-
-    response, status_code = RestaurantPunishmentService.issue_punishment(
-        restaurant_id,
-        data,
-        current_user_id
-    )
-    response["timestamp"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-    return jsonify(response), status_code
 
 @restaurant_punishment_bp.route('/orders/<int:order_id>/refund', methods=['POST'])
 @jwt_required()
@@ -151,38 +185,70 @@ def punish_restaurant(restaurant_id):
     'security': [{'Bearer': []}]
 })
 def issue_refund(order_id):
-    current_user_id = get_jwt_identity()
-    user = User.query.get(current_user_id)
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "body": request.get_json(),
+            "order_id": order_id
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
-    if not user or user.role != 'support':
-        return jsonify({
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.role != 'support':
+            error_response = {
+                "success": False,
+                "message": "Only support team members can issue refunds",
+                "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+            }
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
+
+        data = request.get_json()
+        if not data:
+            error_response = {
+                "success": False,
+                "message": "No data provided",
+                "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
+
+        if not data.get('amount') or not data.get('reason'):
+            error_response = {
+                "success": False,
+                "message": "Amount and reason are required",
+                "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
+
+        response, status_code = RestaurantPunishmentService.issue_refund(
+            order_id,
+            data,
+            current_user_id
+        )
+        response["timestamp"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        print(json.dumps({"response": response, "status": status_code}, indent=2))
+        return jsonify(response), status_code
+
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
-            "message": "Only support team members can issue refunds",
+            "message": "An error occurred while issuing refund",
+            "error": str(e),
             "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        }), 403
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
-    data = request.get_json()
-    if not data:
-        return jsonify({
-            "success": False,
-            "message": "No data provided",
-            "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        }), 400
-
-    if not data.get('amount') or not data.get('reason'):
-        return jsonify({
-            "success": False,
-            "message": "Amount and reason are required",
-            "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        }), 400
-
-    response, status_code = RestaurantPunishmentService.issue_refund(
-        order_id,
-        data,
-        current_user_id
-    )
-    response["timestamp"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-    return jsonify(response), status_code
 
 @restaurant_punishment_bp.route('/restaurants/<int:restaurant_id>/status', methods=['GET'])
 @swag_from({
@@ -217,6 +283,30 @@ def issue_refund(order_id):
     }
 })
 def get_restaurant_status(restaurant_id):
-    status = RestaurantPunishmentService.check_restaurant_status(restaurant_id)
-    status["timestamp"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-    return jsonify(status), 200
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "restaurant_id": restaurant_id
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        status = RestaurantPunishmentService.check_restaurant_status(restaurant_id)
+        status["timestamp"] = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        print(json.dumps({"response": status, "status": 200}, indent=2))
+        return jsonify(status), 200
+
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while retrieving restaurant status",
+            "error": str(e),
+            "timestamp": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

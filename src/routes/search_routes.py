@@ -1,6 +1,9 @@
 # routes/search_routes.py
 
 from flask import Blueprint, request, jsonify
+import json
+import traceback
+import sys
 from src.services.search_service import search_restaurants, search_listings
 
 search_bp = Blueprint("search", __name__)
@@ -59,30 +62,54 @@ def search():
         description: An error occurred during the search.
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         # Get query parameters
         search_type = request.args.get("type")
         query = request.args.get("query", "").strip()
         restaurant_id = request.args.get("restaurant_id", type=int)
 
         if not query:
-            return jsonify({"success": False, "message": "Query parameter is required"}), 400
+            error_response = {"success": False, "message": "Query parameter is required"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         if search_type == "restaurant":
             data = search_restaurants(query)
-            return jsonify({"success": True, "type": "restaurant", "results": data}), 200
+            response = {"success": True, "type": "restaurant", "results": data}
+            print(json.dumps({"response": response, "status": 200}, indent=2))
+            return jsonify(response), 200
 
         elif search_type == "listing":
             if not restaurant_id:
-                return jsonify({"success": False, "message": "Restaurant ID is required for listing search"}), 400
+                error_response = {"success": False, "message": "Restaurant ID is required for listing search"}
+                print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+                return jsonify(error_response), 400
             data = search_listings(query, restaurant_id)
-            return jsonify({"success": True, "type": "listing", "results": data}), 200
+            response = {"success": True, "type": "listing", "results": data}
+            print(json.dumps({"response": response, "status": 200}, indent=2))
+            return jsonify(response), 200
 
         else:
-            return jsonify({"success": False, "message": "Invalid search type. Use 'restaurant' or 'listing'"}), 400
+            error_response = {"success": False, "message": "Invalid search type. Use 'restaurant' or 'listing'"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while performing search",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

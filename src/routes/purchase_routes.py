@@ -14,7 +14,6 @@ from src.services.gamification_services import add_discount_point
 
 purchase_bp = Blueprint("purchase", __name__)
 
-
 @purchase_bp.route("/purchase", methods=["POST"])
 @jwt_required()
 @swag_from({
@@ -25,7 +24,9 @@ purchase_bp = Blueprint("purchase", __name__)
         "If the cart is empty or any item exceeds available stock, the request will fail. "
         "The resulting purchase orders will have a **PENDING** status until the restaurant accepts or rejects them. "
         "If `is_delivery = false`, you can optionally include `pickup_notes`. "
-        "If `is_delivery = true`, you **must** provide `delivery_address`, and you can optionally include `delivery_notes`."
+        "If `is_delivery = true`, you **must** provide `address_id` or delivery address details.\n\n"
+        "Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-19 15:42:48\n"
+        "Current User's Login: emreutkan"
     ),
     "security": [{"BearerAuth": []}],
     "requestBody": {
@@ -41,6 +42,11 @@ purchase_bp = Blueprint("purchase", __name__)
                             "description": "Flag to indicate if this is a delivery order",
                             "example": False
                         },
+                        "address_id": {
+                            "type": "integer",
+                            "description": "ID of the saved address to use for delivery",
+                            "example": 1
+                        },
                         "pickup_notes": {
                             "type": "string",
                             "description": "Optional notes for pickup orders (ignored if is_delivery=true)",
@@ -48,8 +54,23 @@ purchase_bp = Blueprint("purchase", __name__)
                         },
                         "delivery_address": {
                             "type": "string",
-                            "description": "Required only if is_delivery=true",
-                            "example": "123 Main St, YourCity"
+                            "description": "Required only if is_delivery=true and address_id not provided",
+                            "example": "123 Main St"
+                        },
+                        "delivery_district": {
+                            "type": "string",
+                            "description": "District/area name for analytics",
+                            "example": "Downtown"
+                        },
+                        "delivery_province": {
+                            "type": "string",
+                            "description": "Province/state name",
+                            "example": "Istanbul"
+                        },
+                        "delivery_country": {
+                            "type": "string",
+                            "description": "Country name",
+                            "example": "Turkey"
                         },
                         "delivery_notes": {
                             "type": "string",
@@ -66,11 +87,22 @@ purchase_bp = Blueprint("purchase", __name__)
                             "pickup_notes": "Will pick up at 6pm"
                         }
                     },
-                    "delivery_order": {
-                        "summary": "Example (Delivery)",
+                    "delivery_order_with_saved_address": {
+                        "summary": "Example (Delivery with saved address)",
                         "value": {
                             "is_delivery": True,
-                            "delivery_address": "123 Main St, YourCity",
+                            "address_id": 1,
+                            "delivery_notes": "Please leave at the back door"
+                        }
+                    },
+                    "delivery_order_with_new_address": {
+                        "summary": "Example (Delivery with new address)",
+                        "value": {
+                            "is_delivery": True,
+                            "delivery_address": "123 Main St",
+                            "delivery_district": "Downtown",
+                            "delivery_province": "Istanbul",
+                            "delivery_country": "Turkey",
                             "delivery_notes": "Please leave at the back door"
                         }
                     }
@@ -104,9 +136,13 @@ purchase_bp = Blueprint("purchase", __name__)
                                             "enum": ["PENDING", "ACCEPTED", "REJECTED", "COMPLETED"],
                                             "example": "PENDING"
                                         },
-                                        "is_delivery": {"type": "boolean", "example": False},
-                                        "delivery_address": {"type": "string", "example": None},
-                                        "delivery_notes": {"type": "string", "example": None}
+                                        "is_delivery": {"type": "boolean", "example": True},
+                                        "address_title": {"type": "string", "example": "Home"},
+                                        "delivery_address": {"type": "string", "example": "123 Main St"},
+                                        "delivery_district": {"type": "string", "example": "Downtown"},
+                                        "delivery_province": {"type": "string", "example": "Istanbul"},
+                                        "delivery_country": {"type": "string", "example": "Turkey"},
+                                        "delivery_notes": {"type": "string", "example": "Please leave at the back door"}
                                     }
                                 }
                             }

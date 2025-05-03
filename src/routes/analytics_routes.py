@@ -1,8 +1,11 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models import User, Restaurant
 from src.services.analytics_service import RestaurantAnalyticsService
 from functools import wraps
+import json
+import traceback
+import sys
 
 analytics_bp = Blueprint('analytics', __name__)
 
@@ -13,10 +16,12 @@ def owner_required(f):
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
         if not user or user.role != 'owner':
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "This endpoint is only available for restaurant owners"
-            }), 403
+            }
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
         return f(*args, **kwargs)
 
     return decorated_function
@@ -86,9 +91,32 @@ def get_owner_analytics():
       404:
         description: No restaurants found for this owner
     """
-    owner_id = get_jwt_identity()
-    response, status_code = RestaurantAnalyticsService.get_owner_analytics(owner_id)
-    return jsonify(response), status_code
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        owner_id = get_jwt_identity()
+        response, status_code = RestaurantAnalyticsService.get_owner_analytics(owner_id)
+
+        print(json.dumps({"response": response, "status": status_code}, indent=2))
+        return jsonify(response), status_code
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching owner analytics data.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @analytics_bp.route('/analytics/restaurants/<int:restaurant_id>', methods=['GET'])
@@ -171,20 +199,47 @@ def get_restaurant_analytics(restaurant_id):
       404:
         description: Restaurant not found
     """
-    owner_id = get_jwt_identity()
-    restaurant = Restaurant.query.get(restaurant_id)
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
-    if not restaurant:
-        return jsonify({
+        owner_id = get_jwt_identity()
+        restaurant = Restaurant.query.get(restaurant_id)
+
+        if not restaurant:
+            error_response = {
+                "success": False,
+                "message": f"Restaurant with ID {restaurant_id} not found"
+            }
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
+
+        if str(restaurant.owner_id) != str(owner_id):  # Convert both to strings for comparison
+            error_response = {
+                "success": False,
+                "message": "You don't have permission to view this restaurant's analytics"
+            }
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
+
+        response, status_code = RestaurantAnalyticsService.get_restaurant_analytics(restaurant_id)
+
+        print(json.dumps({"response": response, "status": status_code}, indent=2))
+        return jsonify(response), status_code
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately from JSON output
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
-            "message": f"Restaurant with ID {restaurant_id} not found"
-        }), 404
-
-    if str(restaurant.owner_id) != str(owner_id):  # Convert both to strings for comparison
-        return jsonify({
-            "success": False,
-            "message": "You don't have permission to view this restaurant's analytics"
-        }), 403
-
-    response, status_code = RestaurantAnalyticsService.get_restaurant_analytics(restaurant_id)
-    return jsonify(response), status_code
+            "message": "An error occurred while fetching restaurant analytics data.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

@@ -762,7 +762,7 @@ def get_restaurant_comments(restaurant_id):
                 "user_id": comment.user_id,
                 "comment": comment.comment,
                 "rating": float(comment.rating),
-                "timestamp": comment.timestamp.isoformat(),
+                "timestamp": str(comment.timestamp),
                 "badges": badges_data
             }
             comments_data.append(comment_data)

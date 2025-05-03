@@ -2,7 +2,8 @@ import os
 import uuid
 from werkzeug.utils import secure_filename
 from src.models import db, Listing
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
+from src.utils.cloud_storage import upload_file, delete_file, allowed_file
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'routes', 'uploads')
@@ -10,8 +11,10 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def create_listing_service(restaurant_id, owner_id, form_data, file_obj, url_for_func):
     title = form_data.get("title")
@@ -29,16 +32,23 @@ def create_listing_service(restaurant_id, owner_id, form_data, file_obj, url_for
         count = int(count)
         consume_within = int(consume_within)
         if count <= 0 or consume_within < 6:
-            return {"success": False, "message": "Count must be positive and consume within must be at least 6 hours"}, 400
+            return {"success": False,
+                    "message": "Count must be positive and consume within must be at least 6 hours"}, 400
     except ValueError:
         return {"success": False, "message": "Count and consume within must be integers"}, 400
 
     if file_obj and allowed_file(file_obj.filename):
-        original_filename = secure_filename(file_obj.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file_obj.save(filepath)
-        image_url = url_for_func('api_v1.listings.get_uploaded_file', filename=unique_filename, _external=True)
+        success, result = upload_file(
+            file_obj=file_obj,
+            folder="listings",
+            url_for_func=url_for_func,
+            url_endpoint='api_v1.listings.get_uploaded_file'
+        )
+
+        if not success:
+            return {"success": False, "message": result}, 400
+
+        image_url = result
     else:
         return {"success": False, "message": "Invalid or missing image file"}, 400
 
@@ -73,6 +83,7 @@ def create_listing_service(restaurant_id, owner_id, form_data, file_obj, url_for
         "listing": new_listing.to_dict()
     }, 201
 
+
 def get_listings_service(restaurant_id, page, per_page, url_for_func):
     query = Listing.query
     if restaurant_id:
@@ -85,8 +96,13 @@ def get_listings_service(restaurant_id, page, per_page, url_for_func):
     listings_data = []
     for listing in listings:
         if listing.image_url:
-            filename = os.path.basename(listing.image_url)
-            image_url = url_for_func('api_v1.listings.get_uploaded_file', filename=filename, _external=True)
+            # If the URL is from Firebase Storage, use it directly
+            if "firebasestorage.googleapis.com" in listing.image_url:
+                image_url = listing.image_url
+            else:
+                # Otherwise, assume it's a local file and construct the URL
+                filename = os.path.basename(listing.image_url)
+                image_url = url_for_func('api_v1.listings.get_uploaded_file', filename=filename, _external=True)
         else:
             image_url = None
 
@@ -122,6 +138,7 @@ def get_listings_service(restaurant_id, page, per_page, url_for_func):
         }
     }
     return response, 200
+
 
 def search_service(search_type, query_text, restaurant_id):
     from src.models import Restaurant, Listing
@@ -166,6 +183,7 @@ def search_service(search_type, query_text, restaurant_id):
     else:
         return {"success": False, "message": "Invalid search type. Use 'restaurant' or 'listing'"}, 400
 
+
 def edit_listing_service(listing_id, owner_id, form_data, file_obj=None, url_for_func=None):
     listing = Listing.query.get(listing_id)
     if not listing:
@@ -205,17 +223,22 @@ def edit_listing_service(listing_id, owner_id, form_data, file_obj=None, url_for
             return {"success": False, "message": "Consume within must be an integer"}, 400
 
     if file_obj and allowed_file(file_obj.filename):
+        # Delete old image if it exists
         if listing.image_url:
-            old_filename = os.path.basename(listing.image_url)
-            old_filepath = os.path.join(UPLOAD_FOLDER, old_filename)
-            if os.path.exists(old_filepath):
-                os.remove(old_filepath)
+            delete_file(listing.image_url, folder="listings")
 
-        original_filename = secure_filename(file_obj.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file_obj.save(filepath)
-        listing.image_url = url_for_func('api_v1.listings.get_uploaded_file', filename=unique_filename, _external=True)
+        # Upload new image
+        success, result = upload_file(
+            file_obj=file_obj,
+            folder="listings",
+            url_for_func=url_for_func,
+            url_endpoint='api_v1.listings.get_uploaded_file'
+        )
+
+        if not success:
+            return {"success": False, "message": result}, 400
+
+        listing.image_url = result
 
     try:
         db.session.commit()
@@ -227,6 +250,7 @@ def edit_listing_service(listing_id, owner_id, form_data, file_obj=None, url_for
     except Exception as e:
         db.session.rollback()
         return {"success": False, "message": f"Error updating listing: {str(e)}"}, 500
+
 
 def delete_listing_service(listing_id):
     success, message = Listing.delete_listing(listing_id)

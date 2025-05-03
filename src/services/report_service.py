@@ -5,6 +5,7 @@ import uuid
 from werkzeug.utils import secure_filename
 
 from src.models import db, PurchaseReport, Purchase
+from src.utils.cloud_storage import upload_file, allowed_file
 
 # Define the absolute path for the upload folder (relative to this file's directory)
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -14,9 +15,6 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
 # Ensure the upload directory exists
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def allowed_file(filename):
-    """Return True if the filename has an allowed extension."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def create_purchase_report_service(user_id, purchase_id, file_obj, description, url_for_func):
     """
@@ -59,15 +57,18 @@ def create_purchase_report_service(user_id, purchase_id, file_obj, description, 
             return {"message": "Invalid file type"}, 400
 
         try:
-            original_filename = secure_filename(file_obj.filename)
-            unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-            filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
+            # Upload file to cloud or local storage
+            success, result = upload_file(
+                file_obj=file_obj,
+                folder="reports",
+                url_for_func=url_for_func,
+                url_endpoint='api_v1.report.get_uploaded_file'
+            )
 
-            print(f"Saving file to: {filepath}")
-            file_obj.save(filepath)
+            if not success:
+                return {"message": result}, 400
 
-            image_url = url_for_func('api_v1.report.get_uploaded_file',
-                                     filename=unique_filename, _external=True)
+            image_url = result
             print(f"Generated image URL: {image_url}")
 
         except Exception as e:

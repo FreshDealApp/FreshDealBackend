@@ -4,6 +4,7 @@ import os
 from math import radians, cos, sin, asin, sqrt
 from werkzeug.utils import secure_filename
 from src.models import db, Restaurant
+from src.utils.cloud_storage import upload_file, delete_file, allowed_file
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "routes"))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
@@ -13,6 +14,7 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
 def allowed_file(filename):
     """Check if the file has an allowed extension."""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 def restaurant_to_dict(restaurant):
     return {
@@ -89,11 +91,17 @@ def create_restaurant_service(owner_id, form, files, url_for_func):
     image_url = None
     file = files.get("image")
     if file and allowed_file(file.filename):
-        original_filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file.save(filepath)
-        image_url = url_for_func('api_v1.restaurant.get_uploaded_file', filename=unique_filename, _external=True)
+        success, result = upload_file(
+            file_obj=file,
+            folder="restaurants",
+            url_for_func=url_for_func,
+            url_endpoint='api_v1.restaurant.get_uploaded_file'
+        )
+
+        if not success:
+            return {"success": False, "message": result}, 400
+
+        image_url = result
     elif file:
         return {"success": False, "message": "Invalid image file type"}, 400
 
@@ -180,6 +188,7 @@ def create_restaurant_service(owner_id, form, files, url_for_func):
         "restaurant": restaurant_to_dict(new_restaurant)
     }, 201
 
+
 def get_restaurants_service(owner_id):
     """
     Retrieve all restaurants for a given owner.
@@ -214,6 +223,7 @@ def get_restaurants_service(owner_id):
             "restaurantPhone": restaurant.restaurantPhone if restaurant.restaurantPhone else None,
         })
     return serialized, 200
+
 
 def get_restaurant_service(restaurant_id):
     """
@@ -257,6 +267,7 @@ def get_restaurant_service(restaurant_id):
         ]
     }
     return restaurant_data, 200
+
 
 def get_restaurants_proximity_service(user_lat, user_lon, radius=10):
     """
@@ -378,21 +389,22 @@ def update_restaurant_service(restaurant_id, owner_id, form, files, url_for_func
 
     file = files.get("image")
     if file and allowed_file(file.filename):
+        # Delete old image if it exists
         if restaurant.image_url:
-            try:
-                old_filename = restaurant.image_url.split('/')[-1]
-                old_filepath = os.path.join(UPLOAD_FOLDER, old_filename)
-                if os.path.exists(old_filepath):
-                    os.remove(old_filepath)
-            except Exception as e:
-                print(f"Failed to delete old image file: {e}")
+            delete_file(restaurant.image_url, folder="restaurants")
 
-        original_filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file.save(filepath)
-        image_url = url_for_func('api_v1.restaurant.get_uploaded_file', filename=unique_filename, _external=True)
-        restaurant.image_url = image_url
+        # Upload new image
+        success, result = upload_file(
+            file_obj=file,
+            folder="restaurants",
+            url_for_func=url_for_func,
+            url_endpoint='api_v1.restaurant.get_uploaded_file'
+        )
+
+        if not success:
+            return {"success": False, "message": result}, 400
+
+        restaurant.image_url = result
     elif file:
         return {"success": False, "message": "Invalid image file type"}, 400
 
@@ -420,13 +432,13 @@ def update_restaurant_service(restaurant_id, owner_id, form, files, url_for_func
     if restaurant_phone:
         restaurant.restaurantPhone = restaurant_phone
 
-
     db.session.commit()
     return {
         "success": True,
         "message": "Restaurant updated successfully!",
         "restaurant": restaurant_to_dict(restaurant)
     }, 200
+
 
 def delete_restaurant_service(restaurant_id, owner_id):
     """

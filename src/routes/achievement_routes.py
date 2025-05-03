@@ -1,8 +1,12 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.services.achievement_service import AchievementService
+import json
+import traceback
+import sys
 
 achievement_bp = Blueprint("achievement", __name__)
+
 
 @achievement_bp.route("/user/achievements", methods=["GET"])
 @jwt_required()
@@ -44,18 +48,36 @@ def get_user_achievements():
         description: An error occurred
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         achievements = AchievementService.get_user_achievements(user_id)
-        return jsonify({
+
+        response = {
             "achievements": achievements
-        }), 200
+        }
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+
+        return jsonify(response), 200
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while fetching achievements",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @achievement_bp.route("/achievements", methods=["GET"])
 @jwt_required()
@@ -96,14 +118,31 @@ def get_available_achievements():
         description: An error occurred
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         achievements = AchievementService.get_available_achievements()
-        return jsonify({
+
+        response = {
             "achievements": achievements
-        }), 200
+        }
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+
+        return jsonify(response), 200
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while fetching achievements",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

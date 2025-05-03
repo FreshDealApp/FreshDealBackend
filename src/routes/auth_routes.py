@@ -2,8 +2,13 @@
 
 import logging
 import coloredlogs
+import json
+import traceback
+import sys
 from flask import Blueprint, request, jsonify, render_template
-from src.services.auth_service import login_user, register_user, verify_email_code, initiate_password_reset, reset_password
+from src.services.auth_service import login_user, register_user, verify_email_code, initiate_password_reset, \
+    reset_password
+
 auth_bp = Blueprint("auth", __name__)
 
 logger = logging.getLogger(__name__)
@@ -118,10 +123,33 @@ def login():
       429:
         description: Too many login attempts
     """
-    data = request.get_json()
-    client_ip = get_client_ip()
-    response, status = login_user(data, client_ip)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        data = request.get_json()
+        client_ip = get_client_ip()
+        response, status = login_user(data, client_ip)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred during login.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @auth_bp.route("/register", methods=["POST"])
@@ -203,9 +231,32 @@ def register():
       500:
         description: Server error during registration
     """
-    data = request.get_json()
-    response, status = register_user(data)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        data = request.get_json()
+        response, status = register_user(data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred during registration.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @auth_bp.route("/verify_email", methods=["POST"])
@@ -277,13 +328,33 @@ def verify_email():
       500:
         description: Server error during verification
     """
-    data = request.get_json()
-    client_ip = get_client_ip()
-    response, status = verify_email_code(data, client_ip)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
+        data = request.get_json()
+        client_ip = get_client_ip()
+        response, status = verify_email_code(data, client_ip)
 
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
 
+        error_response = {
+            "success": False,
+            "message": "An error occurred during email verification.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
@@ -328,11 +399,33 @@ def forgot_password():
                   type: string
                   example: "Password reset instructions have been sent to your email."
     """
-    data = request.get_json()
-    response, status = initiate_password_reset(data)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
-# routes/auth_routes.py
+        data = request.get_json()
+        response, status = initiate_password_reset(data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while initiating password reset.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @auth_bp.route("/reset-password/<token>", methods=["GET"])
 def reset_password_form(token):
@@ -361,7 +454,29 @@ def reset_password_form(token):
       400:
         description: Invalid or expired token
     """
-    return render_template('auth/reset_password.html', token=token)
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "token": token
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        return render_template('auth/reset_password.html', token=token)
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while displaying reset password form.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
@@ -414,10 +529,36 @@ def reset_password_route():
       400:
         description: Invalid token or password
     """
-    if request.is_json:
-        data = request.get_json()
-    else:
-        data = request.form.to_dict()
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "content_type": request.content_type
+        }
 
-    response, status = reset_password(data)
-    return jsonify(response), status
+        if request.is_json:
+            data = request.get_json()
+            request_log["body"] = data
+        else:
+            data = request.form.to_dict()
+            request_log["form_data"] = data
+
+        print(json.dumps({"request": request_log}, indent=2))
+
+        response, status = reset_password(data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while processing password reset.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

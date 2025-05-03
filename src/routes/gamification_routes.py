@@ -1,6 +1,9 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from src.services.gamification_services import get_user_rankings, get_single_user_rank
+import json
+import traceback
+import sys
 
 gamification_bp = Blueprint("gamification", __name__)
 
@@ -38,15 +41,32 @@ def get_user_rankings_route():
         description: An error occurred.
     """
     try:
-        return get_user_rankings()
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        response = get_user_rankings()
+
+        print(json.dumps({"response": response[0], "status": response[1]}, indent=2))
+        return response
 
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while fetching user rankings",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
 
 @gamification_bp.route("/user/rank/<int:user_id>", methods=["GET"])
 @jwt_required()
@@ -112,11 +132,27 @@ def get_single_user_rank_route(user_id):
                   type: string
     """
     try:
-        return get_single_user_rank(user_id)
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        response = get_single_user_rank(user_id)
+
+        print(json.dumps({"response": response[0], "status": response[1]}, indent=2))
+        return response
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while fetching user rank",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

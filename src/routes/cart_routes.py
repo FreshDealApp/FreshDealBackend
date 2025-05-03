@@ -7,8 +7,12 @@ from src.services.cart_service import (
     remove_from_cart_service,
     reset_cart_service  # new service for resetting the cart
 )
+import json
+import traceback
+import sys
 
 cart_bp = Blueprint("cart", __name__)
+
 
 @cart_bp.route("/cart", methods=["GET"])
 @jwt_required()
@@ -65,15 +69,32 @@ def get_cart_items():
         description: Internal server error
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         cart, status = get_cart_items_service(user_id)
-        return jsonify({"success": True, "cart": cart}), status
+
+        response = {"success": True, "cart": cart}
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @cart_bp.route("/cart", methods=["POST"])
@@ -143,31 +164,53 @@ def add_to_cart():
         description: Listing not found
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         if not data:
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "No JSON data provided"
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         listing_id = data.get("listing_id")
         if not listing_id:
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "listing_id is required"
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         count = data.get("count", 1)
         user_id = get_jwt_identity()
 
         response, status = add_to_cart_service(user_id, listing_id, count)
-        return jsonify({**response, "success": status == 201}), status
+        response_with_success = {**response, "success": status == 201}
+
+        print(json.dumps({"response": response_with_success, "status": status}, indent=2))
+        return jsonify(response_with_success), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @cart_bp.route("/cart", methods=["PUT"])
@@ -228,31 +271,53 @@ def update_cart_item():
         description: Internal server error
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         if not data:
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "No JSON data provided"
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         listing_id = data.get("listing_id")
         count = data.get("count")
 
         if not listing_id or count is None:
-            return jsonify({
+            error_response = {
                 "success": False,
                 "message": "listing_id and count are required"
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         user_id = get_jwt_identity()
         response, status = update_cart_item_service(user_id, listing_id, count)
-        return jsonify({**response, "success": status == 200}), status
+        response_with_success = {**response, "success": status == 200}
+
+        print(json.dumps({"response": response_with_success, "status": status}, indent=2))
+        return jsonify(response_with_success), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @cart_bp.route("/cart/<int:listing_id>", methods=["DELETE"])
@@ -297,15 +362,32 @@ def remove_from_cart(listing_id):
         description: Internal server error
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = remove_from_cart_service(user_id, listing_id)
-        return jsonify({**response, "success": status == 200}), status
+        response_with_success = {**response, "success": status == 200}
+
+        print(json.dumps({"response": response_with_success, "status": status}, indent=2))
+        return jsonify(response_with_success), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @cart_bp.route("/cart/reset", methods=["POST"])
@@ -340,12 +422,29 @@ def reset_cart():
         description: Internal server error
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = reset_cart_service(user_id)
-        return jsonify({**response, "success": status == 200}), status
+        response_with_success = {**response, "success": status == 200}
+
+        print(json.dumps({"response": response_with_success, "status": status}, indent=2))
+        return jsonify(response_with_success), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

@@ -1,8 +1,11 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.AI_services.comment_analysis_service import CommentAnalysisService
 from src.models import Restaurant
 import logging
+import json
+import traceback
+import sys
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -63,7 +66,16 @@ def analyze_restaurant_comments(restaurant_id):
         description: Internal server error
     """
     try:
+        # Log incoming request
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
         logger.info(f"Comment analysis requested for restaurant ID: {restaurant_id}")
+
         user_id = get_jwt_identity()
         logger.info(f"Request from user ID: {user_id}")
 
@@ -71,7 +83,12 @@ def analyze_restaurant_comments(restaurant_id):
         restaurant = Restaurant.query.get(restaurant_id)
         if not restaurant:
             logger.warning(f"Restaurant with ID {restaurant_id} not found")
-            return jsonify({"success": False, "message": f"Restaurant with ID {restaurant_id} not found"}), 404
+            error_response = {
+                "success": False,
+                "message": f"Restaurant with ID {restaurant_id} not found"
+            }
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
         # Initialize comment analyzer
         analyzer = CommentAnalysisService()
@@ -87,23 +104,34 @@ def analyze_restaurant_comments(restaurant_id):
 
             # Provide a more user-friendly message
             if "400 Client Error" in error_msg:
-                return jsonify({
+                error_response = {
                     "success": False,
                     "message": "Error connecting to the analysis service. Please try again later.",
                     "details": "There may be an issue with the API key or the service may be temporarily unavailable."
-                }), 500
+                }
+                print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+                return jsonify(error_response), 500
             else:
-                return jsonify({
+                error_response = {
                     "success": False,
                     "message": error_msg
-                }), 500
+                }
+                print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+                return jsonify(error_response), 500
 
         logger.info(f"Comment analysis completed successfully for restaurant ID: {restaurant_id}")
+        print(json.dumps({"response": analysis_results, "status": 200}, indent=2))
         return jsonify(analysis_results), 200
 
     except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
         logger.exception(f"Unexpected error in comment analysis endpoint: {str(e)}")
-        return jsonify({
+        error_response = {
             "success": False,
             "message": f"Error analyzing restaurant comments: {str(e)}"
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

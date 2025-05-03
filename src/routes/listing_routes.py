@@ -13,12 +13,10 @@ from src.services.listings_service import (
 from src.models import User
 from flasgger import swag_from
 
+from src.utils.cloud_storage import UPLOAD_FOLDER
+
 listings_bp = Blueprint("listings", __name__)
 
-# Define the absolute path for the upload folder
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Common schema definitions for reuse
 LISTING_RESPONSE_SCHEMA = {

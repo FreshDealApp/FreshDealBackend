@@ -1,20 +1,7 @@
 # services/restaurant_service.py
-import uuid
-import os
 from math import radians, cos, sin, asin, sqrt
-from werkzeug.utils import secure_filename
 from src.models import db, Restaurant
 from src.utils.cloud_storage import upload_file, delete_file, allowed_file
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "routes"))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
-
-
-def allowed_file(filename):
-    """Check if the file has an allowed extension."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def restaurant_to_dict(restaurant):
     return {

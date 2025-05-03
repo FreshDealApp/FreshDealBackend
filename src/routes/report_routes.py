@@ -1,4 +1,3 @@
-import os
 import json
 import traceback
 import sys
@@ -7,14 +6,9 @@ from flask import Blueprint, request, jsonify, send_from_directory, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from src.services.report_service import create_purchase_report_service, get_user_reports_service
+from src.utils.cloud_storage import UPLOAD_FOLDER
 
 report_bp = Blueprint("report", __name__)
-
-# Define the absolute path for the upload folder
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 
 @report_bp.route("/report", methods=["POST"])
 @jwt_required()

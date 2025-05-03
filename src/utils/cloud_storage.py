@@ -25,9 +25,14 @@ try:
     firebase_admin.get_app()
 except ValueError:
     # Get Firebase credentials from environment variables
-    firebase_project_id = os.getenv('FIREBASE_PROJECT_ID')
-    firebase_private_key = os.getenv('FIREBASE_PRIVATE_KEY', '').replace('\\n', '\n')
-    firebase_client_email = os.getenv('FIREBASE_CLIENT_EMAIL')
+    firebase_project_id     = os.getenv('FIREBASE_PROJECT_ID')
+    firebase_private_key    = os.getenv('FIREBASE_PRIVATE_KEY', '').replace('\\n', '\n')
+    firebase_client_email   = os.getenv('FIREBASE_CLIENT_EMAIL')
+    # allow overriding the bucket name via .env
+    firebase_storage_bucket = os.getenv(
+        'FIREBASE_STORAGE_BUCKET',
+        f"{firebase_project_id}.appspot.com"
+    )
 
     if firebase_project_id and firebase_private_key and firebase_client_email:
         cred = credentials.Certificate({
@@ -40,8 +45,17 @@ except ValueError:
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
         })
         firebase_admin.initialize_app(cred, {
-            'storageBucket': f"{firebase_project_id}.appspot.com"
+            'storageBucket': firebase_storage_bucket
         })
+        print(f"Firebase initialized with bucket: {firebase_storage_bucket}")
+
+        # Check if bucket exists
+        try:
+            bucket = storage.bucket()
+            bucket.get_blob('test-bucket-existence')
+        except Exception as e:
+            print(f"Warning: Firebase bucket error: {e}")
+            print("You may need to create the bucket in the Firebase console or check permissions.")
     else:
         print("Warning: Firebase credentials not found in environment variables!")
 
@@ -94,43 +108,39 @@ def upload_file(file_obj, folder="uploads", url_for_func=None, url_endpoint=None
         original_filename = secure_filename(file_obj.filename)
         unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
 
-        # Compress the image if it's a supported format
+        # Compress images
         if any(ext in original_filename.lower() for ext in ['.jpg', '.jpeg', '.png']):
-            file_obj.seek(0)  # Reset file pointer to beginning
-            compressed_file, _ = compress_image(file_obj)
-            file_to_upload = compressed_file
+            file_obj.seek(0)
+            file_to_upload, _ = compress_image(file_obj)
         else:
-            file_obj.seek(0)  # Reset file pointer to beginning
+            file_obj.seek(0)
             file_to_upload = file_obj
 
         # Try Firebase Storage first
         try:
-            if firebase_admin._apps:
-                bucket = storage.bucket()
+            bucket = storage.bucket()
+            print(f"Attempting to upload to Firebase bucket: {bucket.name}")
 
-                # Create a blob and upload the file's contents
-                blob = bucket.blob(f"{folder}/{unique_filename}")
-                blob.upload_from_file(file_to_upload)
+            blob = bucket.blob(f"{folder}/{unique_filename}")
+            file_to_upload.seek(0)
+            blob.upload_from_file(file_to_upload)
+            blob.make_public()
 
-                # Make the blob publicly accessible
-                blob.make_public()
-
-                # Get the public URL
-                image_url = blob.public_url
-                print(f"Uploaded to Firebase Storage: {image_url}")
-                return True, image_url
-            else:
-                raise ValueError("Firebase not initialized")
+            image_url = blob.public_url
+            print(f"Uploaded to Firebase Storage: {image_url}")
+            return True, image_url
 
         except Exception as firebase_error:
-            print(f"Firebase upload error, falling back to local storage: {str(firebase_error)}")
+            print(f"Firebase upload error, falling back to local storage: {firebase_error}")
 
             # Fallback to local storage
             if url_for_func and url_endpoint:
-                file_to_upload.seek(0)  # Reset file pointer to beginning
+                if not os.path.exists(UPLOAD_FOLDER):
+                    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+                file_to_upload.seek(0)
                 filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
 
-                # If it's a BytesIO object from compression
                 if isinstance(file_to_upload, io.BytesIO):
                     with open(filepath, 'wb') as f:
                         f.write(file_to_upload.getvalue())
@@ -144,8 +154,8 @@ def upload_file(file_obj, folder="uploads", url_for_func=None, url_endpoint=None
                 return False, "Cannot save to local storage - url_for function or endpoint not provided"
 
     except Exception as e:
-        print(f"Error uploading file: {str(e)}")
-        return False, f"Error uploading file: {str(e)}"
+        print(f"Error uploading file: {e}")
+        return False, f"Error uploading file: {e}"
 
 
 def delete_file(image_url, folder="uploads"):
@@ -163,31 +173,23 @@ def delete_file(image_url, folder="uploads"):
         return True, "No image to delete"
 
     try:
-        # Check if it's a Firebase Storage URL
+        # Firebase Storage URL
         if "firebasestorage.googleapis.com" in image_url:
-            try:
-                if firebase_admin._apps:
-                    bucket = storage.bucket()
-                    filename = os.path.basename(image_url.split('?')[0])
-                    blob = bucket.blob(f"{folder}/{filename}")
-                    blob.delete()
-                    return True, f"Successfully deleted image from Firebase: {filename}"
-                else:
-                    return False, "Firebase not initialized"
-            except Exception as e:
-                print(f"Error deleting from Firebase: {str(e)}")
-                return False, f"Error deleting from Firebase: {str(e)}"
+            if firebase_admin._apps:
+                bucket = storage.bucket()
+                filename = os.path.basename(image_url.split('?')[0])
+                blob = bucket.blob(f"{folder}/{filename}")
+                blob.delete()
+                return True, f"Successfully deleted image from Firebase: {filename}"
+            else:
+                return False, "Firebase not initialized"
         else:
-            # Assume it's a local file
-            try:
-                filename = image_url.split('/')[-1]
-                filepath = os.path.join(UPLOAD_FOLDER, filename)
-                if os.path.exists(filepath):
-                    os.remove(filepath)
-                    return True, f"Successfully deleted local image: {filename}"
-                return True, f"Local image file not found: {filename}"
-            except Exception as e:
-                return False, f"Failed to delete local image file: {str(e)}"
-
+            # Local file
+            filename = image_url.split('/')[-1]
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+            if os.path.exists(filepath):
+                os.remove(filepath)
+                return True, f"Successfully deleted local image: {filename}"
+            return True, f"Local image file not found: {filename}"
     except Exception as e:
-        return False, f"Error processing delete request: {str(e)}"
+        return False, f"Failed to delete file: {e}"

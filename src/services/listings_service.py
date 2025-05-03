@@ -1,20 +1,7 @@
 import os
-import uuid
-from werkzeug.utils import secure_filename
 from src.models import db, Listing
 from datetime import datetime, timedelta, UTC
 from src.utils.cloud_storage import upload_file, delete_file, allowed_file
-
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'routes', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
-
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
-
 
 def create_listing_service(restaurant_id, owner_id, form_data, file_obj, url_for_func):
     title = form_data.get("title")

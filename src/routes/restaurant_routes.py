@@ -17,14 +17,9 @@ from src.services.restaurant_service import (
     get_restaurants_proximity_service,
 )
 from src.models import User, RestaurantComment
+from src.utils.cloud_storage import UPLOAD_FOLDER
 
 restaurant_bp = Blueprint("restaurant", __name__)
-
-# Define upload folder (should match the one in the service layer)
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 
 @restaurant_bp.route("/restaurants", methods=["POST"])
 @jwt_required()

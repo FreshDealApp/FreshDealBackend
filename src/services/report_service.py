@@ -1,20 +1,6 @@
 # services/report_service.py
-import os
-import uuid
-
-from werkzeug.utils import secure_filename
-
 from src.models import db, PurchaseReport, Purchase
 from src.utils.cloud_storage import upload_file, allowed_file
-
-# Define the absolute path for the upload folder (relative to this file's directory)
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'routes', 'uploads')
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
-
-# Ensure the upload directory exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 
 def create_purchase_report_service(user_id, purchase_id, file_obj, description, url_for_func):
     """

@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, UTC
-from src.models import db, UserAchievement, Achievement, AchievementType, Purchase, PurchaseStatus
+from src.models import db, UserAchievement, Achievement, AchievementType, Purchase, PurchaseStatus, RestaurantComment
 
 
 class AchievementService:
@@ -55,6 +55,13 @@ class AchievementService:
                 achievement_type=AchievementType.WEEKLY_PURCHASE,
                 badge_image_url="/static/badges/weekly_champion.png",
                 threshold=5
+            ),
+            Achievement(
+                name="Regular Commenter",
+                description="Made 100 comments in 90 days",
+                achievement_type=AchievementType.REGULAR_COMMENTER,
+                badge_image_url="/static/badges/regular_commenter.png",
+                threshold=100
             )
         ]
 
@@ -76,6 +83,9 @@ class AchievementService:
 
         # Check weekly purchase achievement (5 purchases in a week)
         newly_earned.extend(AchievementService._check_weekly_purchase_achievement(user_id))
+
+        # Check comment achievement (100 comments in 90 days)
+        newly_earned.extend(AchievementService._check_comment_achievement(user_id))
 
         return newly_earned
 
@@ -198,6 +208,42 @@ class AchievementService:
                 db.session.add(user_achievement)
                 db.session.commit()
                 newly_earned.append(weekly_achievement)
+
+        return newly_earned
+
+    @staticmethod
+    def _check_comment_achievement(user_id):
+
+        newly_earned = []
+
+        comment_achievement = Achievement.query.filter_by(
+            achievement_type=AchievementType.REGULAR_COMMENTER
+        ).first()
+
+        if not comment_achievement:
+            return newly_earned
+
+        existing = UserAchievement.query.filter_by(
+            user_id=user_id,
+            achievement_id=comment_achievement.id
+        ).first()
+
+        if not existing:
+            ninety_days_ago = datetime.now(UTC) - timedelta(days=90)
+
+            comment_count = db.session.query(RestaurantComment).filter(
+                RestaurantComment.user_id == user_id,
+                RestaurantComment.timestamp >= ninety_days_ago
+            ).count()
+
+            if comment_count >= comment_achievement.threshold:
+                user_achievement = UserAchievement(
+                    user_id=user_id,
+                    achievement_id=comment_achievement.id
+                )
+                db.session.add(user_achievement)
+                db.session.commit()
+                newly_earned.append(comment_achievement)
 
         return newly_earned
 

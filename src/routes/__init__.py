@@ -17,6 +17,8 @@ from src.routes.achievement_routes import achievement_bp
 from src.routes.restaurant_badge_routes import restaurant_badge_bp
 from src.routes.comment_analysis_routes import comment_analysis_bp
 from src.routes.restaurant_punishment_routes import restaurant_punishment_bp
+from src.routes.rec_routes import recommendation_bp
+from src.routes.restaurant_rec_routes import restaurant_recommendation_bp
 
 def init_app(app):
     api_v1 = Blueprint('api_v1', __name__, url_prefix='/v1')
@@ -37,6 +39,8 @@ def init_app(app):
     api_v1.register_blueprint(analytics_bp)
     api_v1.register_blueprint(comment_analysis_bp)
     api_v1.register_blueprint(restaurant_punishment_bp)
+    api_v1.register_blueprint(recommendation_bp)
+    api_v1.register_blueprint(restaurant_recommendation_bp)
 
 
     app.register_blueprint(api_v1)

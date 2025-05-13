@@ -46,7 +46,7 @@ class RestaurantAnalyticsService:
                     "user_name": comment.user.name,
                     "rating": float(comment.rating),
                     "comment": comment.comment,
-                    "timestamp": comment.timestamp.isoformat()
+                    "timestamp": comment.timestamp if isinstance(comment.timestamp, str) else comment.timestamp.isoformat()
                 } for comment in comments[:5]]
             }
 
@@ -102,7 +102,7 @@ class RestaurantAnalyticsService:
                 "user_name": comment.user.name,
                 "rating": float(comment.rating),
                 "comment": comment.comment,
-                "timestamp": comment.timestamp.isoformat(),
+                "timestamp": comment.timestamp if isinstance(comment.timestamp, str) else comment.timestamp.isoformat(),
                 "badges": [{
                     "name": badge.badge_name,
                     "is_positive": badge.is_positive

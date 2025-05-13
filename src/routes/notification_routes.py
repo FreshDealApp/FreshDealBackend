@@ -2,6 +2,9 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.services.notification_service import NotificationService
 from flasgger import swag_from
+import json
+import traceback
+import sys
 
 notification_bp = Blueprint('notification', __name__)
 import logging
@@ -192,28 +195,43 @@ test_notification_doc = {
 def update_push_token():
     """Update or register a device push token."""
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json() if request.is_json else {}
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         data = request.get_json()
 
         if not data:
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'Request body is required'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         if 'push_token' not in data:
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'Push token is required'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         # Validate device_type if provided
         device_type = data.get('device_type', 'unknown')
         if device_type not in ['ios', 'android', 'unknown']:
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'Invalid device type. Must be ios, android, or unknown'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         logger.info(f"Updating push token for user {user_id}")
 
@@ -226,23 +244,32 @@ def update_push_token():
 
         if not success:
             logger.error(f"Failed to update push token for user {user_id}: {message}")
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': message
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         logger.info(f"Successfully updated push token for user {user_id}")
-        return jsonify({
+        response = {
             'success': True,
             'message': message
-        }), 200
+        }
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         logger.error(f"Error in update_push_token: {str(e)}")
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             'success': False,
             'message': 'Internal server error'
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @notification_bp.route('/users/push-token', methods=['DELETE'])
@@ -251,37 +278,57 @@ def update_push_token():
 def delete_push_token():
     """Deactivate a push token."""
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json() if request.is_json else {}
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         data = request.get_json()
 
         if not data or 'push_token' not in data:
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'Push token is required'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         logger.info(f"Deactivating push token for user {user_id}")
 
         success = NotificationService.deactivate_token(data['push_token'])
         if not success:
             logger.error(f"Failed to deactivate token for user {user_id}")
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'Failed to deactivate token'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         logger.info(f"Successfully deactivated token for user {user_id}")
-        return jsonify({
+        response = {
             'success': True,
             'message': 'Token deactivated successfully'
-        }), 200
+        }
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         logger.error(f"Error in delete_push_token: {str(e)}")
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             'success': False,
             'message': 'Internal server error'
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @notification_bp.route('/notifications/test', methods=['POST'])
@@ -290,6 +337,15 @@ def delete_push_token():
 def test_notification():
     """Send a test notification to the user's devices."""
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "body": request.get_json() if request.is_json else {}
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
 
         logger.info(f"Sending test notification to user {user_id}")
@@ -297,10 +353,12 @@ def test_notification():
         # Get user's devices first to check if they have any
         devices = NotificationService.get_user_devices(user_id)
         if not devices:
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'No active devices found for this user'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         success = NotificationService.send_notification_to_user(
             user_id=user_id,
@@ -314,23 +372,32 @@ def test_notification():
 
         if not success:
             logger.error(f"Failed to send test notification to user {user_id}")
-            return jsonify({
+            error_response = {
                 'success': False,
                 'message': 'Failed to send test notification'
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         logger.info(f"Successfully sent test notification to user {user_id}")
-        return jsonify({
+        response = {
             'success': True,
             'message': 'Test notification sent successfully'
-        }), 200
+        }
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         logger.error(f"Error in test_notification: {str(e)}")
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             'success': False,
             'message': 'Internal server error'
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 # New endpoint to get user's devices
@@ -339,17 +406,32 @@ def test_notification():
 def get_user_devices():
     """Get all devices registered for the current user."""
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         devices = NotificationService.get_user_devices(user_id)
 
-        return jsonify({
+        response = {
             'success': True,
             'devices': devices
-        }), 200
+        }
+        print(json.dumps({"response": response, "status": 200}, indent=2))
+        return jsonify(response), 200
 
     except Exception as e:
         logger.error(f"Error in get_user_devices: {str(e)}")
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             'success': False,
             'message': 'Internal server error'
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

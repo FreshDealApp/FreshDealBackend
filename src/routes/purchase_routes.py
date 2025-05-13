@@ -1,6 +1,9 @@
 from flask import Blueprint, jsonify, request, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from flasgger import swag_from
+import json
+import traceback
+import sys
 
 from src.services.purchase_service import (
     create_purchase_order_service,
@@ -14,19 +17,20 @@ from src.services.gamification_services import add_discount_point
 
 purchase_bp = Blueprint("purchase", __name__)
 
+
 @purchase_bp.route("/purchase", methods=["POST"])
 @jwt_required()
 @swag_from({
     "tags": ["Purchases"],
     "summary": "Create a new purchase order from cart items",
     "description": (
-        "Creates one or more purchase orders for all items in the user's cart. "
-        "If the cart is empty or any item exceeds available stock, the request will fail. "
-        "The resulting purchase orders will have a **PENDING** status until the restaurant accepts or rejects them. "
-        "If `is_delivery = false`, you can optionally include `pickup_notes`. "
-        "If `is_delivery = true`, you **must** provide `address_id` or delivery address details.\n\n"
-        "Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-19 15:42:48\n"
-        "Current User's Login: emreutkan"
+            "Creates one or more purchase orders for all items in the user's cart. "
+            "If the cart is empty or any item exceeds available stock, the request will fail. "
+            "The resulting purchase orders will have a **PENDING** status until the restaurant accepts or rejects them. "
+            "If `is_delivery = false`, you can optionally include `pickup_notes`. "
+            "If `is_delivery = true`, you **must** provide `address_id` or delivery address details.\n\n"
+            "Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): 2025-04-19 15:42:48\n"
+            "Current User's Login: emreutkan"
     ),
     "security": [{"BearerAuth": []}],
     "requestBody": {
@@ -197,10 +201,34 @@ purchase_bp = Blueprint("purchase", __name__)
     }
 })
 def create_purchase_order():
-    user_id = get_jwt_identity()
-    data = request.get_json() or {}
-    response, status = create_purchase_order_service(user_id, data)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "data": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        user_id = get_jwt_identity()
+        data = request.get_json() or {}
+        response, status = create_purchase_order_service(user_id, data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while creating the purchase order.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/purchase/<int:purchase_id>/response", methods=["POST"])
@@ -209,9 +237,9 @@ def create_purchase_order():
     "tags": ["Purchases"],
     "summary": "Restaurant response to a purchase order",
     "description": (
-        "Allows the restaurant (owner) to accept or reject a **PENDING** purchase order. "
-        "If the order is **rejected**, stock is restored. "
-        "If the current user is not the owner of the restaurant associated with this purchase, the request is forbidden."
+            "Allows the restaurant (owner) to accept or reject a **PENDING** purchase order. "
+            "If the order is **rejected**, stock is restored. "
+            "If the current user is not the owner of the restaurant associated with this purchase, the request is forbidden."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -295,17 +323,38 @@ def create_purchase_order():
     }
 })
 def restaurant_response(purchase_id):
-    restaurant_id = get_jwt_identity()
-    action = request.json.get('action')
-    response, status = handle_restaurant_response_service(
-        purchase_id,
-        restaurant_id,
-        action
-    )
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "data": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
+        restaurant_id = get_jwt_identity()
+        action = request.json.get('action')
+        response, status = handle_restaurant_response_service(
+            purchase_id,
+            restaurant_id,
+            action
+        )
 
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
 
+        error_response = {
+            "success": False,
+            "message": "An error occurred while processing the restaurant response.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/restaurant/<int:restaurant_id>/purchases", methods=["GET"])
@@ -314,8 +363,8 @@ def restaurant_response(purchase_id):
     "tags": ["Purchases"],
     "summary": "Get all purchases for a restaurant",
     "description": (
-        "Retrieves all purchase orders linked to a specific restaurant. "
-        "Typically, only the restaurant owner should be allowed to view these orders."
+            "Retrieves all purchase orders linked to a specific restaurant. "
+            "Typically, only the restaurant owner should be allowed to view these orders."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -378,8 +427,31 @@ def restaurant_response(purchase_id):
     }
 })
 def get_restaurant_purchases(restaurant_id):
-    response, status = get_restaurant_purchases_service(restaurant_id)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        response, status = get_restaurant_purchases_service(restaurant_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching restaurant purchases.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/purchases/<int:purchase_id>/accept", methods=["POST"])
@@ -388,8 +460,8 @@ def get_restaurant_purchases(restaurant_id):
     "tags": ["Purchases"],
     "summary": "Accept a purchase order",
     "description": (
-        "Allows the restaurant owner to explicitly accept a **PENDING** purchase order. "
-        "Once accepted, the purchase can later be marked as completed with a completion image."
+            "Allows the restaurant owner to explicitly accept a **PENDING** purchase order. "
+            "Once accepted, the purchase can later be marked as completed with a completion image."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -445,10 +517,33 @@ def get_restaurant_purchases(restaurant_id):
     }
 })
 def accept_purchase(purchase_id):
-    restaurant_id = get_jwt_identity()
-    response, status = handle_restaurant_response_service(purchase_id, restaurant_id, 'accept')
-    add_discount_point(purchase_id)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        restaurant_id = get_jwt_identity()
+        response, status = handle_restaurant_response_service(purchase_id, restaurant_id, 'accept')
+        add_discount_point(purchase_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while accepting the purchase.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/purchases/<int:purchase_id>/reject", methods=["POST"])
@@ -457,8 +552,8 @@ def accept_purchase(purchase_id):
     "tags": ["Purchases"],
     "summary": "Reject a purchase order",
     "description": (
-        "Allows the restaurant owner to explicitly reject a **PENDING** purchase order. "
-        "Once rejected, the stock is restored for the associated listing."
+            "Allows the restaurant owner to explicitly reject a **PENDING** purchase order. "
+            "Once rejected, the stock is restored for the associated listing."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -514,9 +609,32 @@ def accept_purchase(purchase_id):
     }
 })
 def reject_purchase(purchase_id):
-    restaurant_id = get_jwt_identity()
-    response, status = handle_restaurant_response_service(purchase_id, restaurant_id, 'reject')
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        restaurant_id = get_jwt_identity()
+        response, status = handle_restaurant_response_service(purchase_id, restaurant_id, 'reject')
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while rejecting the purchase.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/user/orders/active", methods=["GET"])
@@ -525,8 +643,8 @@ def reject_purchase(purchase_id):
     "tags": ["Purchases"],
     "summary": "Get user's active orders",
     "description": (
-        "Retrieves all active (PENDING or ACCEPTED) orders for the current user. "
-        "Active orders are those that have not been completed or rejected yet."
+            "Retrieves all active (PENDING or ACCEPTED) orders for the current user. "
+            "Active orders are those that have not been completed or rejected yet."
     ),
     "security": [{"BearerAuth": []}],
     "responses": {
@@ -566,7 +684,8 @@ def reject_purchase(purchase_id):
                                             "properties": {
                                                 "id": {"type": "integer", "example": 5},
                                                 "name": {"type": "string", "example": "Cupcake Heaven"},
-                                                "image_url": {"type": "string", "example": "https://example.com/image.jpg"}
+                                                "image_url": {"type": "string",
+                                                              "example": "https://example.com/image.jpg"}
                                             }
                                         }
                                     }
@@ -582,9 +701,32 @@ def reject_purchase(purchase_id):
     }
 })
 def get_user_active_orders():
-    user_id = get_jwt_identity()
-    response, status = get_user_active_orders_service(user_id)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        user_id = get_jwt_identity()
+        response, status = get_user_active_orders_service(user_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching active orders.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/user/orders/previous", methods=["GET"])
@@ -593,8 +735,8 @@ def get_user_active_orders():
     "tags": ["Purchases"],
     "summary": "Get user's previous orders",
     "description": (
-        "Retrieves all completed or rejected orders for the current user, with pagination. "
-        "Use `page` and `per_page` query parameters to navigate through results."
+            "Retrieves all completed or rejected orders for the current user, with pagination. "
+            "Use `page` and `per_page` query parameters to navigate through results."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -673,11 +815,34 @@ def get_user_active_orders():
     }
 })
 def get_user_previous_orders():
-    user_id = get_jwt_identity()
-    page = request.args.get('page', 1, type=int)
-    per_page = request.args.get('per_page', 10, type=int)
-    response, status = get_user_previous_orders_service(user_id, page, per_page)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        user_id = get_jwt_identity()
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 10, type=int)
+        response, status = get_user_previous_orders_service(user_id, page, per_page)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching previous orders.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/user/orders/<int:purchase_id>", methods=["GET"])
@@ -686,9 +851,9 @@ def get_user_previous_orders():
     "tags": ["Purchases"],
     "summary": "Get detailed information about a specific order",
     "description": (
-        "Retrieves all available details of a given purchase order by its ID, "
-        "including listing and restaurant details if any. "
-        "Only the user who made the order can access these details."
+            "Retrieves all available details of a given purchase order by its ID, "
+            "including listing and restaurant details if any. "
+            "Only the user who made the order can access these details."
     ),
     "security": [{"BearerAuth": []}],
     "parameters": [
@@ -764,9 +929,32 @@ def get_user_previous_orders():
     }
 })
 def get_order_details(purchase_id):
-    user_id = get_jwt_identity()
-    response, status = get_order_details_service(user_id, purchase_id)
-    return jsonify(response), status
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        user_id = get_jwt_identity()
+        response, status = get_order_details_service(user_id, purchase_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching order details.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @purchase_bp.route("/purchase/<int:purchase_id>/completion-image", methods=["POST"])
@@ -854,23 +1042,50 @@ def add_completion_image(purchase_id):
     """
     Example of how to handle file uploads in Flask.
     """
-    # Current user/owner ID
-    owner_id = get_jwt_identity()
+    try:
+        # Log the request excluding the binary file to keep logs reasonable
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "files": [k for k in request.files.keys()]
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
-    # Retrieve file object from request (under the key 'file')
-    file_obj = request.files.get('file')
+        # Current user/owner ID
+        owner_id = get_jwt_identity()
 
-    if not file_obj:
-        return jsonify({"message": "No file provided"}), 400
+        # Retrieve file object from request (under the key 'file')
+        file_obj = request.files.get('file')
 
-    # Pass the file to your service layer or handle it directly here
-    # Suppose your service is updated to accept `file_obj` instead of `image_url`
-    from src.services.purchase_service import add_completion_image_service
+        if not file_obj:
+            error_response = {"message": "No file provided"}
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
-    response, status = add_completion_image_service(
-        purchase_id=purchase_id,
-        owner_id=owner_id,
-        file_obj=file_obj,
-        url_for_func=url_for  # <-- pass Flask's url_for here
-    )
-    return jsonify(response), status
+        # Pass the file to your service layer or handle it directly here
+        # Suppose your service is updated to accept `file_obj` instead of `image_url`
+        from src.services.purchase_service import add_completion_image_service
+
+        response, status = add_completion_image_service(
+            purchase_id=purchase_id,
+            owner_id=owner_id,
+            file_obj=file_obj,
+            url_for_func=url_for  # <-- pass Flask's url_for here
+        )
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while uploading the completion image.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

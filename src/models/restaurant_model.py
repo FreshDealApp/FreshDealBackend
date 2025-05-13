@@ -1,11 +1,9 @@
 import os
-
 from . import db
 from sqlalchemy import Integer, String, DECIMAL, Boolean, Float
 from sqlalchemy.orm import validates, relationship
-
 from datetime import datetime, UTC
-
+from .restaurant_punishment_model import RestaurantPunishment
 
 
 class Restaurant(db.Model):
@@ -35,12 +33,16 @@ class Restaurant(db.Model):
     pickup = db.Column(Boolean, nullable=False, default=False)
     delivery = db.Column(Boolean, nullable=False, default=False)
 
-    maxDeliveryDistance = db.Column(Float, nullable=True)  # Radius in kilometers
+    maxDeliveryDistance = db.Column(Float, nullable=True)
     deliveryFee = db.Column(DECIMAL(10, 2), nullable=True)
     minOrderAmount = db.Column(DECIMAL(10, 2), nullable=True)
 
+    flash_deals_available = db.Column(Boolean, nullable=False, default=False)
+    flash_deals_count = db.Column(Integer, nullable=False, default=0)
+
     comments = relationship("RestaurantComment", back_populates="restaurant", cascade="all, delete-orphan")
     purchases = relationship('Purchase', back_populates='restaurant')
+    punishments = relationship('RestaurantPunishment', backref='restaurant', lazy=True)
 
     @validates('workingDays')
     def validate_working_days(self, key, working_days):
@@ -70,23 +72,17 @@ class Restaurant(db.Model):
         return rating
 
     def update_rating(self, new_rating):
-        """Update the restaurant's average rating and rating count."""
         from decimal import Decimal
         new_rating = Decimal(str(new_rating))
         if self.rating is None:
-                self.rating = new_rating
-                self.ratingCount = 1
+            self.rating = new_rating
+            self.ratingCount = 1
         else:
             total_rating = self.rating * self.ratingCount
             self.ratingCount += 1
             self.rating = (total_rating + new_rating) / self.ratingCount
 
     def update_listings_count(self, increment=True):
-        """
-        Updates the restaurant's listings count
-        Args:
-            increment (bool): True to increment, False to decrement
-        """
         if increment:
             self.listings += 1
         else:
@@ -94,10 +90,6 @@ class Restaurant(db.Model):
         db.session.add(self)
 
     def try_delete_image_file(self, image_url):
-        """
-        Attempt to delete image file without raising exceptions.
-        Returns (success, message) tuple.
-        """
         from ..routes.restaurant_routes import UPLOAD_FOLDER
 
         if not image_url:
@@ -113,12 +105,36 @@ class Restaurant(db.Model):
         except Exception as e:
             return False, f"Failed to delete image file: {str(e)}"
 
+    def is_active(self):
+        current_time = datetime.now(UTC)
+        punishment = RestaurantPunishment.query.filter(
+            RestaurantPunishment.restaurant_id == self.id,
+            (
+                    (RestaurantPunishment.punishment_type == 'PERMANENT') |
+                    (
+                            (RestaurantPunishment.punishment_type == 'TEMPORARY') &
+                            (RestaurantPunishment.end_date > current_time)
+                    )
+            )
+        ).first()
+        return punishment is None
+
+    def can_accept_orders(self):
+        return self.is_active()
+
+    def can_update_details(self):
+        return self.is_active()
+
+    def increment_flash_deals_count(self):
+        self.flash_deals_count += 1
+        if self.flash_deals_count >= 3:
+            self.flash_deals_available = False
+        db.session.add(self)
+        db.session.commit()
+
     @classmethod
     def delete_restaurant_service(cls, restaurant_id, owner_id):
-        """
-        Delete a restaurant by its ID if it is owned by the specified owner.
-        """
-        from .listing_model import Listing  # Import here to avoid circular imports
+        from .listing_model import Listing
 
         restaurant = cls.query.get(restaurant_id)
         if not restaurant:
@@ -128,13 +144,11 @@ class Restaurant(db.Model):
             return {"success": False, "message": "You are not the owner of this restaurant."}, 403
 
         deletion_log = []
-        image_url = restaurant.image_url  # Store for later use
+        image_url = restaurant.image_url
 
         try:
-            # Get all listings before deleting them
             listings = Listing.query.filter_by(restaurant_id=restaurant_id).all()
 
-            # Handle each listing individually
             for listing in listings:
                 print(f"[{datetime.now(UTC)}] Attempting to delete listing {listing.id}")
                 success, message = Listing.delete_listing(listing.id)
@@ -148,11 +162,9 @@ class Restaurant(db.Model):
                 if not success:
                     print(f"[{datetime.now(UTC)}] Warning: Issue with listing {listing.id}: {message}")
 
-            # Delete the restaurant from database
             db.session.delete(restaurant)
             db.session.commit()
 
-            # After successful database operations, try to delete the image file
             image_delete_success, image_delete_message = restaurant.try_delete_image_file(image_url)
 
             response = {

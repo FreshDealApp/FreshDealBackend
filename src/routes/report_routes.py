@@ -1,16 +1,14 @@
-import os
+import json
+import traceback
+import sys
 
 from flask import Blueprint, request, jsonify, send_from_directory, url_for
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from src.services.report_service import create_purchase_report_service, get_user_reports_service
+from src.utils.cloud_storage import UPLOAD_FOLDER
 
 report_bp = Blueprint("report", __name__)
-
-# Define the absolute path for the upload folder
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 @report_bp.route("/report", methods=["POST"])
 @jwt_required()
@@ -97,30 +95,35 @@ def create_report():
               type: string
     """
     try:
-        user_id = get_jwt_identity()
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "form_data": dict(request.form),
+            "files": {k: f"{v.filename} ({v.content_type})" for k, v in request.files.items()} if request.files else {}
+        }
+        print(json.dumps({"request": request_log}, indent=2))
 
-        # Debug logging
-        print("Request form data:", request.form)
-        print("Request files:", request.files)
+        user_id = get_jwt_identity()
 
         # Get form data and file
         purchase_id = request.form.get("purchase_id")
         description = request.form.get("description")
         file_obj = request.files.get("image")
 
-        print(f"purchase_id: {purchase_id}")
-        print(f"description: {description}")
-        print(f"file_obj: {file_obj}")
-
         if not purchase_id or not description:
-            return jsonify({
+            error_response = {
                 "message": "Missing required fields (purchase_id, description)."
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         if not file_obj:
-            return jsonify({
+            error_response = {
                 "message": "Missing image file."
-            }), 400
+            }
+            print(json.dumps({"error_response": error_response, "status": 400}, indent=2))
+            return jsonify(error_response), 400
 
         response, status = create_purchase_report_service(
             user_id=user_id,
@@ -129,16 +132,22 @@ def create_report():
             description=description,
             url_for_func=url_for
         )
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
 
     except Exception as e:
-        import traceback
-        print("Error in create_report:", str(e))
-        print("Traceback:", traceback.format_exc())
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @report_bp.route('/uploads/<filename>', methods=['GET'])
 def get_uploaded_file(filename):
@@ -176,10 +185,36 @@ def get_uploaded_file(filename):
               example: "File not found"
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "filename": filename
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         filename = secure_filename(filename)
         return send_from_directory(UPLOAD_FOLDER, filename)
     except FileNotFoundError:
-        return jsonify({"success": False, "message": "File not found"}), 404
+        error_response = {
+            "success": False,
+            "message": "File not found"
+        }
+        print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+        return jsonify(error_response), 404
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while fetching the file",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @report_bp.route("/report", methods=["GET"])
 @jwt_required()
@@ -246,11 +281,27 @@ def get_user_reports():
               type: string
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = get_user_reports_service(user_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "message": "An error occurred",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

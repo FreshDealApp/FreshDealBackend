@@ -1,4 +1,7 @@
 import os
+import json
+import traceback
+import sys
 from flask import Blueprint, request, jsonify, url_for, send_from_directory
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
@@ -8,13 +11,12 @@ from src.services.listings_service import (
     search_service
 )
 from src.models import User
+from flasgger import swag_from
+
+from src.utils.cloud_storage import UPLOAD_FOLDER
 
 listings_bp = Blueprint("listings", __name__)
 
-# Define the absolute path for the upload folder
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 # Common schema definitions for reuse
 LISTING_RESPONSE_SCHEMA = {
@@ -34,8 +36,6 @@ LISTING_RESPONSE_SCHEMA = {
         "available_for_delivery": {"type": "boolean", "description": "Whether the item is available for delivery"}
     }
 }
-
-from flasgger import swag_from
 
 # First, define the JSON documentation for create_listing endpoint
 create_listing_doc = {
@@ -425,20 +425,31 @@ delete_listing_doc = {
     }
 }
 
+
 @listings_bp.route("/restaurants/<int:restaurant_id>/listings", methods=["POST"])
 @jwt_required()
 @swag_from(create_listing_doc)
-
 def create_listing(restaurant_id):
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         owner_id = get_jwt_identity()
         owner = User.query.get(owner_id)
         if not owner:
-            return jsonify({"success": False, "message": "Owner not found"}), 404
+            error_response = {"success": False, "message": "Owner not found"}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
         if owner.role != "owner":
-            return jsonify({"success": False, "message": "Only owners can add listings"}), 403
+            error_response = {"success": False, "message": "Only owners can add listings"}
+            print(json.dumps({"error_response": error_response, "status": 403}, indent=2))
+            return jsonify(error_response), 403
 
         form_data = request.form.to_dict()
         file_obj = request.files.get("image")
@@ -446,72 +457,127 @@ def create_listing(restaurant_id):
         response, status = create_listing_service(
             restaurant_id, owner_id, form_data, file_obj, url_for
         )
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({"success": False, "message": "An error occurred", "error": str(e)}), 500
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @listings_bp.route('/uploads/<filename>', methods=['GET'])
 @swag_from(get_uploaded_file_doc)
-
 def get_uploaded_file(filename):
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         filename = secure_filename(filename)
         return send_from_directory(UPLOAD_FOLDER, filename)
     except FileNotFoundError:
-        return jsonify({"success": False, "message": "File not found"}), 404
+        error_response = {"success": False, "message": "File not found"}
+        print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+        return jsonify(error_response), 404
+    except Exception as e:
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {"success": False, "message": "An error occurred", "error": str(e)}
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @listings_bp.route("/listings", methods=["GET"])
 @swag_from(get_listings_doc)
-
 def get_listings():
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         restaurant_id = request.args.get('restaurant_id', type=int)
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         response, status = get_listings_service(restaurant_id, page, per_page, url_for)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while fetching listings",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
 
 
 @listings_bp.route("/search", methods=["GET"])
 @swag_from(search_doc)
-
 def search():
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         search_type = request.args.get("type")
         query_text = request.args.get("query", "").strip()
         restaurant_id = request.args.get("restaurant_id", type=int)
         response, status = search_service(search_type, query_text, restaurant_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while performing search",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @listings_bp.route("/listings/<int:listing_id>", methods=["PUT"])
-
 @jwt_required()
 @swag_from(edit_listing_doc)
-
 def edit_listing(listing_id):
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         owner_id = get_jwt_identity()
         owner = User.query.get(owner_id)
         if not owner:
-            return jsonify({"success": False, "message": "Owner not found"}), 404
+            error_response = {"success": False, "message": "Owner not found"}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
         form_data = request.form.to_dict()
         file_obj = request.files.get("image")
@@ -524,34 +590,57 @@ def edit_listing(listing_id):
             file_obj=file_obj,
             url_for_func=url_for
         )
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while updating the listing",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500
+
 
 @listings_bp.route("/listings/<int:listing_id>", methods=["DELETE"])
 @jwt_required()
 @swag_from(delete_listing_doc)
-
 def delete_listing(listing_id):
-
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         owner_id = get_jwt_identity()
         owner = User.query.get(owner_id)
         if not owner:
-            return jsonify({"success": False, "message": "Owner not found"}), 404
+            error_response = {"success": False, "message": "Owner not found"}
+            print(json.dumps({"error_response": error_response, "status": 404}, indent=2))
+            return jsonify(error_response), 404
 
         from src.services.listings_service import delete_listing_service
         response, status = delete_listing_service(
             listing_id=listing_id
         )
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
-        return jsonify({
+        print("An error occurred:", str(e))
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while deleting the listing",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response, "status": 500}, indent=2))
+        return jsonify(error_response), 500

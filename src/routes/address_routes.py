@@ -1,5 +1,3 @@
-# routes/addresses.py
-
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.services.address_service import (
@@ -9,6 +7,9 @@ from src.services.address_service import (
     update_address as update_address_service,
     delete_address as delete_address_service,
 )
+import json
+import traceback
+import sys
 
 addresses_bp = Blueprint("addresses", __name__)
 
@@ -140,17 +141,33 @@ def create_address():
           description: Server error
       """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "data": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         data = request.get_json()
         user_id = get_jwt_identity()
         response, status = create_address_service(user_id, data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "success": False,
             "message": "An error occurred while creating the address.",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @addresses_bp.route("/addresses", methods=["GET"])
@@ -214,15 +231,30 @@ def list_addresses():
                      example: "No addresses found for the user"
        """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = list_addresses_service(user_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "message": "An error occurred while fetching addresses.",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @addresses_bp.route("/addresses/<int:address_id>", methods=["GET"])
@@ -313,15 +345,30 @@ def get_address(address_id):
             description: Server error
         """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = get_address_service(user_id, address_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "message": "An error occurred while fetching the address.",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @addresses_bp.route("/addresses/<int:address_id>", methods=["PUT"])
@@ -387,16 +434,32 @@ def update_address(address_id):
         description: Address not found
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args),
+            "data": request.get_json()
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         data = request.get_json()
         response, status = update_address_service(user_id, address_id, data)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "message": "An error occurred while updating the address.",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
 
 
 @addresses_bp.route("/addresses/<int:address_id>", methods=["DELETE"])
@@ -430,12 +493,27 @@ def delete_address(address_id):
         description: Address not found
     """
     try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
         user_id = get_jwt_identity()
         response, status = delete_address_service(user_id, address_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
     except Exception as e:
         print("An error occurred:", str(e))
-        return jsonify({
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
             "message": "An error occurred while deleting the address.",
             "error": str(e)
-        }), 500
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500

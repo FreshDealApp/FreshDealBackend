@@ -7,6 +7,9 @@ from dotenv import load_dotenv
 from src.models import db
 from src.routes import init_app
 from flasgger import Swagger
+from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, UTC
+from src.models.listing_model import Listing
 
 load_dotenv()
 
@@ -32,10 +35,11 @@ def create_app():
         f"{required_env_vars['DB_SERVER']}/"
         f"{required_env_vars['DB_NAME']}?driver={required_env_vars['DB_DRIVER']}"
     )
-   # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456789@127.0.0.1:3306/freshdeallocal'
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:123456789@127.0.0.1:3306/freshdeallocal'
+
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['UPLOAD_FOLDER'] = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'uploads')
-    #
+
     app.config['JWT_SECRET_KEY'] = required_env_vars['JWT_SECRET_KEY']
     JWTManager(app)
 
@@ -58,33 +62,25 @@ def create_app():
     except Exception as e:
         print(f"Error connecting to the database: {e}")
 
-    init_app(app)
-
     CORS(app, resources={r"/*": {"origins": "*"}})
 
-    # Flasgger setup with OpenAPI 3.0 and global security definitions
     swagger_config = {
-        "openapi": "3.0.0",  # Using OpenAPI 3.0
+        "openapi": "3.0.0",
         "info": {
             "title": "Freshdeal API",
-            "description": "API for Freshdeal application"
-                           ,
+            "description": "API for Freshdeal application",
             "version": "1.0.0",
             "contact": {
                 "name": "Freshdeal",
                 "url": "https://github.com/FreshDealApp",
                 "email": "",
-
             }
         },
         "servers": [
             {"url": "https://freshdealbackend.azurewebsites.net/",
              "description": "Production server"},
             {"url": "http://localhost:8000", "description": "Local development server"},
-
-
         ],
-        # Global security scheme using JWT bearer token
         "components": {
             "securitySchemes": {
                 "BearerAuth": {
@@ -94,7 +90,6 @@ def create_app():
                 }
             }
         },
-        # Apply the security scheme globally to all endpoints
         "security": [
             {
                 "BearerAuth": []
@@ -104,8 +99,8 @@ def create_app():
             {
                 "endpoint": 'apispec_1',
                 "route": '/apispec_1.json',
-                "rule_filter": lambda rule: True,  # Include all API routes
-                "model_filter": lambda tag: True,  # Include all tags
+                "rule_filter": lambda rule: True,
+                "model_filter": lambda tag: True,
             }
         ],
         "static_url_path": "/flasgger_static",
@@ -115,6 +110,30 @@ def create_app():
     }
 
     Swagger(app, config=swagger_config)
+
+    def update_all_listings():
+        with app.app_context():
+            try:
+                listings = Listing.query.filter(Listing.expires_at > datetime.now(UTC)).all()
+                for listing in listings:
+                    listing.update_expiry()
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"Error updating listings: {str(e)}")
+
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        func=update_all_listings,
+        trigger='interval',
+        hours=2,
+        id='update_listings_job',
+        name='Update listings fresh score and consume within time',
+        replace_existing=True
+    )
+    scheduler.start()
+
+    init_app(app)
 
     @app.route('/')
     def redirect_to_swagger():

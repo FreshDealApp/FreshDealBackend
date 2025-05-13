@@ -3,12 +3,15 @@ import uuid
 
 from sqlalchemy import and_
 from werkzeug.utils import secure_filename
+from decimal import Decimal
 
 from src.models import db, UserCart, Purchase, Restaurant, CustomerAddress
 
 from src.models.purchase_model import PurchaseStatus
 from src.services.notification_service import NotificationService
 from src.services.achievement_service import AchievementService
+from src.services.business_notification_service import BusinessNotificationService
+from src.services.discount_service import apply_discount
 
 
 def create_purchase_order_service(user_id, data=None):
@@ -23,6 +26,7 @@ def create_purchase_order_service(user_id, data=None):
 
         is_delivery = data.get('is_delivery', False) if data else False
         notes = data.get('pickup_notes') if not is_delivery else data.get('delivery_notes')
+        is_flash_deal = data.get('flashdealsactivated', 0) == 1 if data else False
 
         # Get user's primary address or the specified address
         address_id = data.get('address_id')
@@ -52,6 +56,10 @@ def create_purchase_order_service(user_id, data=None):
             if not restaurant:
                 return {"message": f"Restaurant (ID: {listing.restaurant_id}) not found"}, 404
 
+            # Check if flash deal is activated and available
+            if is_flash_deal and not restaurant.flash_deals_available:
+                return {"message": f"Flash deals are not available for restaurant: {restaurant.restaurantName}"}, 400
+
             delivery_fee = restaurant.deliveryFee if is_delivery else 0
             total_price = (price_to_use * item.count) + delivery_fee
 
@@ -73,6 +81,7 @@ def create_purchase_order_service(user_id, data=None):
                     total_price=total_price,
                     status=PurchaseStatus.PENDING,
                     is_delivery=is_delivery,
+                    is_flash_deal=is_flash_deal,
                     address_title=address.title,
                     delivery_address=address_str,
                     delivery_district=address.district,
@@ -94,18 +103,48 @@ def create_purchase_order_service(user_id, data=None):
             purchases.append(purchase)
             cart_items_to_clear.append(item)
 
+        # Apply discount based on total purchase amount
+        total_before_discount, discount_amount, purchases_with_discount = apply_discount(purchases)
+
         for item in cart_items_to_clear:
             db.session.delete(item)
 
+        # Increment flash deals count if applicable
+        processed_restaurants = set()
+        for purchase in purchases_with_discount:
+            if purchase.is_flash_deal and purchase.restaurant_id not in processed_restaurants:
+                restaurant = Restaurant.query.get(purchase.restaurant_id)
+                if restaurant:
+                    restaurant.increment_flash_deals_count()
+                    processed_restaurants.add(purchase.restaurant_id)
+
         db.session.commit()
-        return {
+
+        # Send notifications to restaurant owners for each purchase
+        for purchase in purchases_with_discount:
+            BusinessNotificationService.send_purchase_notification(purchase.id)
+
+        # Prepare response with discount information
+        response = {
             "message": "Purchase order created successfully, waiting for restaurant approval",
-            "purchases": [p.to_dict() for p in purchases]
-        }, 201
+            "purchases": [p.to_dict() for p in purchases_with_discount]
+        }
+
+        # Include discount information if a discount was applied
+        if discount_amount > Decimal('0'):
+            response["discount_info"] = {
+                "total_before_discount": str(total_before_discount),
+                "discount_amount": str(discount_amount),
+                "total_after_discount": str(total_before_discount - discount_amount)
+            }
+
+        return response, 201
 
     except Exception as e:
         db.session.rollback()
         return {"message": "An error occurred", "error": str(e)}, 500
+
+
 def handle_restaurant_response_service(purchase_id, owner_id, action):
     """
     Second step: Restaurant accepts or rejects the order.

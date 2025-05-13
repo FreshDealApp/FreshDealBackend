@@ -15,7 +15,7 @@ def get_cart_items_service(user_id):
             "restaurant_id": item.restaurant_id,
             "title": item.listing.title,
             "count": item.count,
-            "added_at": item.added_at
+            "added_at": item.added_at.isoformat() if item.added_at else None
         }
         for item in cart_items
     ]

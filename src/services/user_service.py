@@ -207,33 +207,21 @@ def get_user_recent_restaurants_service(user_id):
         # Query to get the latest purchase date for each restaurant
         recent_restaurants = db.session.query(
             Purchase.restaurant_id,
-            func.max(Purchase.purchase_date).label('last_order_date'),
-            Restaurant.restaurantName,
-            Restaurant.image_url
-        ).join(
-            Restaurant,
-            Purchase.restaurant_id == Restaurant.id
+            func.max(Purchase.purchase_date).label('last_order_date')
         ).filter(
             Purchase.user_id == user_id,
             Purchase.status.in_([PurchaseStatus.COMPLETED, PurchaseStatus.ACCEPTED])
         ).group_by(
-            Purchase.restaurant_id,
-            Restaurant.restaurantName,
-            Restaurant.image_url
+            Purchase.restaurant_id
         ).order_by(
             desc('last_order_date')
         ).limit(20).all()
 
-        restaurants = [{
-            "restaurant_id": restaurant.restaurant_id,
-            "restaurant_name": restaurant.restaurantName,
-            "image_url": restaurant.image_url,
-            "last_order_date": restaurant.last_order_date.isoformat()
-        } for restaurant in recent_restaurants]
+        restaurant_ids = [restaurant.restaurant_id for restaurant in recent_restaurants]
 
         return {
             "success": True,
-            "restaurants": restaurants
+            "restaurants": restaurant_ids
         }, 200
 
     except Exception as e:

@@ -1,5 +1,5 @@
 from . import db
-from sqlalchemy import Integer, ForeignKey, DECIMAL, DateTime
+from sqlalchemy import Integer, ForeignKey, DECIMAL, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from enum import Enum as PyEnum
@@ -44,6 +44,7 @@ class Purchase(db.Model):
     purchase_date = db.Column(DateTime, nullable=False, default=datetime.utcnow)
     status = db.Column(db.Enum(PurchaseStatus), default=PurchaseStatus.PENDING, nullable=False)
     is_delivery = db.Column(db.Boolean, default=False, nullable=False)
+    is_flash_deal = db.Column(Boolean, default=False, nullable=False)
 
     # Address information (stored regardless of delivery type)
     address_title = db.Column(db.String(80))
@@ -61,6 +62,7 @@ class Purchase(db.Model):
     restaurant_comment = relationship('RestaurantComment', uselist=False, back_populates='purchase')
 
     def __init__(self, **kwargs):
+        self.is_flash_deal = kwargs.pop('is_flash_deal', False)
         super(Purchase, self).__init__(**kwargs)
         self.validate_delivery_info()
 
@@ -127,6 +129,7 @@ class Purchase(db.Model):
             "status": self.status.value,
             "is_active": self.is_active,
             "is_delivery": self.is_delivery,
+            "is_flash_deal": self.is_flash_deal,
             "address_title": self.address_title,
             "delivery_address": self.delivery_address,
             "delivery_district": self.delivery_district,

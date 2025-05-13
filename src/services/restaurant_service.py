@@ -1,18 +1,8 @@
 # services/restaurant_service.py
-import uuid
-import os
 from math import radians, cos, sin, asin, sqrt
-from werkzeug.utils import secure_filename
 from src.models import db, Restaurant
+from src.utils.cloud_storage import upload_file, delete_file, allowed_file
 
-BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "routes"))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webm'}
-
-
-def allowed_file(filename):
-    """Check if the file has an allowed extension."""
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 def restaurant_to_dict(restaurant):
     return {
@@ -37,6 +27,8 @@ def restaurant_to_dict(restaurant):
         "minOrderAmount": float(restaurant.minOrderAmount) if restaurant.minOrderAmount else None,
         "restaurantEmail": restaurant.restaurantEmail if restaurant.restaurantEmail else None,
         "restaurantPhone": restaurant.restaurantPhone if restaurant.restaurantPhone else None,
+        "flash_deals_available": restaurant.flash_deals_available,
+        "flash_deals_count": restaurant.flash_deals_count
     }
 
 
@@ -67,6 +59,7 @@ def create_restaurant_service(owner_id, form, files, url_for_func):
     max_delivery_distance = form.get('maxDeliveryDistance')
     restaurant_email = form.get('restaurantEmail')
     restaurant_phone = form.get('restaurantPhone')
+    flash_deals_available = form.get('flash_deals_available', 'false').lower() == 'true'
 
     if not restaurant_name:
         return {"success": False, "message": "Restaurant name is required"}, 400
@@ -89,11 +82,17 @@ def create_restaurant_service(owner_id, form, files, url_for_func):
     image_url = None
     file = files.get("image")
     if file and allowed_file(file.filename):
-        original_filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file.save(filepath)
-        image_url = url_for_func('api_v1.restaurant.get_uploaded_file', filename=unique_filename, _external=True)
+        success, result = upload_file(
+            file_obj=file,
+            folder="restaurants",
+            url_for_func=url_for_func,
+            url_endpoint='api_v1.restaurant.get_uploaded_file'
+        )
+
+        if not success:
+            return {"success": False, "message": result}, 400
+
+        image_url = result
     elif file:
         return {"success": False, "message": "Invalid image file type"}, 400
 
@@ -118,7 +117,9 @@ def create_restaurant_service(owner_id, form, files, url_for_func):
         deliveryFee=delivery_fee,
         minOrderAmount=min_order_amount,
         restaurantEmail=restaurant_email,
-        restaurantPhone=restaurant_phone
+        restaurantPhone=restaurant_phone,
+        flash_deals_available=flash_deals_available,
+        flash_deals_count=0
     )
 
     db.session.add(new_restaurant)
@@ -180,6 +181,7 @@ def create_restaurant_service(owner_id, form, files, url_for_func):
         "restaurant": restaurant_to_dict(new_restaurant)
     }, 201
 
+
 def get_restaurants_service(owner_id):
     """
     Retrieve all restaurants for a given owner.
@@ -190,30 +192,9 @@ def get_restaurants_service(owner_id):
 
     serialized = []
     for restaurant in restaurants:
-        serialized.append({
-            "id": restaurant.id,
-            "owner_id": restaurant.owner_id,
-            "restaurantName": restaurant.restaurantName,
-            "restaurantDescription": restaurant.restaurantDescription,
-            "longitude": float(restaurant.longitude),
-            "latitude": float(restaurant.latitude),
-            "category": restaurant.category,
-            "workingDays": restaurant.workingDays.split(",") if restaurant.workingDays else [],
-            "workingHoursStart": restaurant.workingHoursStart,
-            "workingHoursEnd": restaurant.workingHoursEnd,
-            "listings": restaurant.listings,
-            "rating": float(restaurant.rating) if restaurant.rating else None,
-            "ratingCount": restaurant.ratingCount,
-            "image_url": restaurant.image_url,
-            "pickup": restaurant.pickup,
-            "delivery": restaurant.delivery,
-            "maxDeliveryDistance": restaurant.maxDeliveryDistance,
-            "deliveryFee": float(restaurant.deliveryFee) if restaurant.deliveryFee else None,
-            "minOrderAmount": float(restaurant.minOrderAmount) if restaurant.minOrderAmount else None,
-            "restaurantEmail": restaurant.restaurantEmail if restaurant.restaurantEmail else None,
-            "restaurantPhone": restaurant.restaurantPhone if restaurant.restaurantPhone else None,
-        })
+        serialized.append(restaurant_to_dict(restaurant))
     return serialized, 200
+
 
 def get_restaurant_service(restaurant_id):
     """
@@ -223,40 +204,20 @@ def get_restaurant_service(restaurant_id):
     if not restaurant:
         return {"success": False, "message": f"Restaurant with ID {restaurant_id} not found."}, 404
 
-    restaurant_data = {
-        "id": restaurant.id,
-        "owner_id": restaurant.owner_id,
-        "restaurantName": restaurant.restaurantName,
-        "restaurantDescription": restaurant.restaurantDescription,
-        "longitude": float(restaurant.longitude),
-        "latitude": float(restaurant.latitude),
-        "category": restaurant.category,
-        "workingDays": restaurant.workingDays.split(",") if restaurant.workingDays else [],
-        "workingHoursStart": restaurant.workingHoursStart,
-        "workingHoursEnd": restaurant.workingHoursEnd,
-        "listings": restaurant.listings,
-        "rating": float(restaurant.rating) if restaurant.rating else None,
-        "ratingCount": restaurant.ratingCount,
-        "image_url": restaurant.image_url,
-        "pickup": restaurant.pickup,
-        "delivery": restaurant.delivery,
-        "maxDeliveryDistance": restaurant.maxDeliveryDistance,
-        "deliveryFee": float(restaurant.deliveryFee) if restaurant.deliveryFee else None,
-        "minOrderAmount": float(restaurant.minOrderAmount) if restaurant.minOrderAmount else None,
-        "restaurantEmail": restaurant.restaurantEmail if restaurant.restaurantEmail else None,
-        "restaurantPhone": restaurant.restaurantPhone if restaurant.restaurantPhone else None,
-        "comments": [
-            {
-                "id": comment.id,
-                "user_id": comment.user_id,
-                "comment": comment.comment,
-                "rating": float(comment.rating),
-                "timestamp": comment.timestamp.isoformat()
-            }
-            for comment in restaurant.comments
-        ]
-    }
+    restaurant_data = restaurant_to_dict(restaurant)
+    restaurant_data["comments"] = [
+        {
+            "id": comment.id,
+            "user_id": comment.user_id,
+            "comment": comment.comment,
+            "rating": float(comment.rating),
+            "timestamp": comment.timestamp.isoformat()
+        }
+        for comment in restaurant.comments
+    ]
+
     return restaurant_data, 200
+
 
 def get_restaurants_proximity_service(user_lat, user_lon, radius=10):
     """
@@ -284,34 +245,49 @@ def get_restaurants_proximity_service(user_lat, user_lon, radius=10):
     for restaurant in restaurants:
         dist = haversine(user_lat, user_lon, float(restaurant.latitude), float(restaurant.longitude))
         if dist <= radius and (restaurant.maxDeliveryDistance is None or dist <= restaurant.maxDeliveryDistance):
-            nearby.append({
-                "id": restaurant.id,
-                "owner_id": restaurant.owner_id,
-                "restaurantName": restaurant.restaurantName,
-                "restaurantDescription": restaurant.restaurantDescription,
-                "longitude": float(restaurant.longitude),
-                "latitude": float(restaurant.latitude),
-                "category": restaurant.category,
-                "workingDays": restaurant.workingDays.split(",") if restaurant.workingDays else [],
-                "workingHoursStart": restaurant.workingHoursStart,
-                "workingHoursEnd": restaurant.workingHoursEnd,
-                "listings": restaurant.listings,
-                "rating": float(restaurant.rating) if restaurant.rating else None,
-                "ratingCount": restaurant.ratingCount,
-                "image_url": restaurant.image_url,
-                "pickup": restaurant.pickup,
-                "delivery": restaurant.delivery,
-                "maxDeliveryDistance": restaurant.maxDeliveryDistance,
-                "deliveryFee": float(restaurant.deliveryFee) if restaurant.deliveryFee else None,
-                "minOrderAmount": float(restaurant.minOrderAmount) if restaurant.minOrderAmount else None,
-                "restaurantEmail": restaurant.restaurantEmail if restaurant.restaurantEmail else None,
-                "restaurantPhone": restaurant.restaurantPhone if restaurant.restaurantPhone else None,
-                "distance_km": round(dist, 2)
-
-            })
+            restaurant_dict = restaurant_to_dict(restaurant)
+            restaurant_dict["distance_km"] = round(dist, 2)
+            nearby.append(restaurant_dict)
 
     if not nearby:
         return {"message": "No restaurants found within the specified radius"}, 404
+
+    nearby.sort(key=lambda x: x['distance_km'])
+    return {"restaurants": nearby}, 200
+
+
+def get_flash_deals_service(user_lat, user_lon, radius=30):
+    """
+    Retrieve restaurants with flash deals based on proximity.
+    """
+    try:
+        user_lat = float(user_lat)
+        user_lon = float(user_lon)
+        radius = float(radius)
+    except ValueError:
+        return {"success": False, "message": "Invalid latitude, longitude, or radius format"}, 400
+
+    def haversine(lat1, lon1, lat2, lon2):
+        # Convert degrees to radians
+        lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+        d_lat = lat2 - lat1
+        d_lon = lon2 - lon1
+        a = sin(d_lat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(d_lon / 2) ** 2
+        c = 2 * asin(sqrt(a))
+        earth_radius = 6371  # km
+        return c * earth_radius
+
+    restaurants = Restaurant.query.filter_by(flash_deals_available=True).all()
+    nearby = []
+    for restaurant in restaurants:
+        dist = haversine(user_lat, user_lon, float(restaurant.latitude), float(restaurant.longitude))
+        if dist <= radius and (restaurant.maxDeliveryDistance is None or dist <= restaurant.maxDeliveryDistance):
+            restaurant_dict = restaurant_to_dict(restaurant)
+            restaurant_dict["distance_km"] = round(dist, 2)
+            nearby.append(restaurant_dict)
+
+    if not nearby:
+        return {"message": "No flash deals available within the specified radius"}, 404
 
     nearby.sort(key=lambda x: x['distance_km'])
     return {"restaurants": nearby}, 200
@@ -350,11 +326,17 @@ def update_restaurant_service(restaurant_id, owner_id, form, files, url_for_func
     max_delivery_distance = form.get('maxDeliveryDistance', restaurant.maxDeliveryDistance)
     restaurant_email = form.get('restaurantEmail', restaurant.restaurantEmail)
     restaurant_phone = form.get('restaurantPhone', restaurant.restaurantPhone)
+    flash_deals_available = form.get('flash_deals_available')
 
     if pickup is not None:
         pickup = pickup.lower() == 'true'
     if delivery is not None:
         delivery = delivery.lower() == 'true'
+    if flash_deals_available is not None:
+        flash_deals_available = flash_deals_available.lower() == 'true'
+        # Reset flash deals count if restaurant is newly available for flash deals
+        if flash_deals_available and not restaurant.flash_deals_available:
+            restaurant.flash_deals_count = 0
 
     if not restaurant_name:
         return {"success": False, "message": "Restaurant name is required"}, 400
@@ -378,21 +360,22 @@ def update_restaurant_service(restaurant_id, owner_id, form, files, url_for_func
 
     file = files.get("image")
     if file and allowed_file(file.filename):
+        # Delete old image if it exists
         if restaurant.image_url:
-            try:
-                old_filename = restaurant.image_url.split('/')[-1]
-                old_filepath = os.path.join(UPLOAD_FOLDER, old_filename)
-                if os.path.exists(old_filepath):
-                    os.remove(old_filepath)
-            except Exception as e:
-                print(f"Failed to delete old image file: {e}")
+            delete_file(restaurant.image_url, folder="restaurants")
 
-        original_filename = secure_filename(file.filename)
-        unique_filename = f"{uuid.uuid4().hex}_{original_filename}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file.save(filepath)
-        image_url = url_for_func('api_v1.restaurant.get_uploaded_file', filename=unique_filename, _external=True)
-        restaurant.image_url = image_url
+        # Upload new image
+        success, result = upload_file(
+            file_obj=file,
+            folder="restaurants",
+            url_for_func=url_for_func,
+            url_endpoint='api_v1.restaurant.get_uploaded_file'
+        )
+
+        if not success:
+            return {"success": False, "message": result}, 400
+
+        restaurant.image_url = result
     elif file:
         return {"success": False, "message": "Invalid image file type"}, 400
 
@@ -412,6 +395,8 @@ def update_restaurant_service(restaurant_id, owner_id, form, files, url_for_func
         restaurant.pickup = pickup
     if delivery is not None:
         restaurant.delivery = delivery
+    if flash_deals_available is not None:
+        restaurant.flash_deals_available = flash_deals_available
     restaurant.maxDeliveryDistance = max_delivery_distance
     restaurant.deliveryFee = delivery_fee
     restaurant.minOrderAmount = min_order_amount
@@ -420,13 +405,13 @@ def update_restaurant_service(restaurant_id, owner_id, form, files, url_for_func
     if restaurant_phone:
         restaurant.restaurantPhone = restaurant_phone
 
-
     db.session.commit()
     return {
         "success": True,
         "message": "Restaurant updated successfully!",
         "restaurant": restaurant_to_dict(restaurant)
     }, 200
+
 
 def delete_restaurant_service(restaurant_id, owner_id):
     """

@@ -170,12 +170,12 @@ class RestaurantPunishmentService:
             db.session.add(refund)
             db.session.commit()
 
-            print(f"MOCK: Refund email sent to user {purchase.user_id} for amount ${refund.amount}")
+            print(f"MOCK: Refund email sent to user {purchase.user_id} for amount {refund.amount}")
 
             NotificationService.send_notification_to_user(
                 user_id=purchase.user_id,
                 title="Refund Issued",
-                body=f"A refund of ${refund.amount} has been issued for your order."
+                body=f"A refund of {refund.amount} has been issued for your order."
             )
 
             refund.processed = True

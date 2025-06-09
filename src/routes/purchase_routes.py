@@ -12,6 +12,7 @@ from src.services.purchase_service import (
     get_user_active_orders_service,
     get_user_previous_orders_service,
     get_order_details_service,
+    check_purchase_rating_service,
 )
 from src.services.gamification_services import add_discount_point
 
@@ -528,7 +529,10 @@ def accept_purchase(purchase_id):
 
         restaurant_id = get_jwt_identity()
         response, status = handle_restaurant_response_service(purchase_id, restaurant_id, 'accept')
-        add_discount_point(purchase_id)
+
+        # Only add discount points if the acceptance was successful (status 200)
+        if status == 200:
+            add_discount_point(purchase_id)
 
         print(json.dumps({"response": response, "status": status}, indent=2))
         return jsonify(response), status
@@ -1085,6 +1089,84 @@ def add_completion_image(purchase_id):
         error_response = {
             "success": False,
             "message": "An error occurred while uploading the completion image.",
+            "error": str(e)
+        }
+        print(json.dumps({"error_response": error_response}, indent=2))
+        return jsonify(error_response), 500
+
+
+@purchase_bp.route("/purchase/<int:purchase_id>/has-rating", methods=["GET"])
+@jwt_required()
+@swag_from({
+    "tags": ["Purchases"],
+    "summary": "Check if a user has rated a specific purchase",
+    "description": (
+            "Checks if the current user has already submitted a rating/review for a specific purchase. "
+            "This endpoint is useful for frontend applications to determine whether to show the review form "
+            "or the existing review for a completed purchase."
+    ),
+    "security": [{"BearerAuth": []}],
+    "parameters": [
+        {
+            "name": "purchase_id",
+            "in": "path",
+            "schema": {"type": "integer"},
+            "required": True,
+            "description": "ID of the purchase to check for ratings",
+            "example": 101
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Successfully checked rating status",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "success": {"type": "boolean", "example": True},
+                            "message": {"type": "string", "example": "User has already rated this purchase"},
+                            "has_rating": {"type": "boolean", "example": True},
+                            "rating": {"type": "number", "example": 4.5},
+                            "comment": {"type": "string", "example": "Great food and service!"},
+                            "rating_timestamp": {"type": "string", "format": "date-time", "example": "2025-01-20T15:30:45"},
+                            "is_completed": {"type": "boolean", "example": True}
+                        }
+                    }
+                }
+            }
+        },
+        "404": {
+            "description": "Purchase not found or does not belong to the user"
+        },
+        "500": {
+            "description": "Internal server error"
+        }
+    }
+})
+def check_purchase_rating(purchase_id):
+    try:
+        request_log = {
+            "endpoint": request.path,
+            "method": request.method,
+            "headers": dict(request.headers),
+            "args": dict(request.args)
+        }
+        print(json.dumps({"request": request_log}, indent=2))
+
+        user_id = get_jwt_identity()
+        response, status = check_purchase_rating_service(user_id, purchase_id)
+
+        print(json.dumps({"response": response, "status": status}, indent=2))
+        return jsonify(response), status
+    except Exception as e:
+        print("An error occurred:", str(e))
+        # Print traceback to console separately
+        traceback.print_exc(file=sys.stderr)
+
+        error_response = {
+            "success": False,
+            "message": "An error occurred while checking purchase rating.",
             "error": str(e)
         }
         print(json.dumps({"error_response": error_response}, indent=2))

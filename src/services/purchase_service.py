@@ -509,3 +509,60 @@ def add_completion_image_service(purchase_id, owner_id, file_obj, url_for_func):
         db.session.rollback()
         print(f"[DEBUG] General Exception: {e}")
         return {"message": "An error occurred", "error": str(e)}, 500
+
+
+def check_purchase_rating_service(user_id, purchase_id):
+    """
+    Check if a user has already rated/commented on a specific purchase.
+
+    Args:
+        user_id (int): The ID of the user
+        purchase_id (int): The ID of the purchase to check
+
+    Returns:
+        tuple: (response_dict, status_code)
+    """
+    try:
+        # First, verify the purchase exists and belongs to the user
+        purchase = Purchase.query.filter_by(id=purchase_id, user_id=user_id).first()
+
+        if not purchase:
+            return {
+                "success": False,
+                "message": "Purchase not found or does not belong to the user"
+            }, 404
+
+        # Check if the purchase status is COMPLETED (only completed purchases can be rated)
+        if purchase.status != PurchaseStatus.COMPLETED:
+            return {
+                "success": False,
+                "message": "Purchase is not yet completed and cannot be rated",
+                "is_completed": False
+            }, 200
+
+        # Check if the purchase already has a comment/rating
+        if purchase.restaurant_comment:
+            return {
+                "success": True,
+                "message": "User has already rated this purchase",
+                "has_rating": True,
+                "rating": float(purchase.restaurant_comment.rating),
+                "comment": purchase.restaurant_comment.comment,
+                "rating_timestamp": purchase.restaurant_comment.timestamp.isoformat() if purchase.restaurant_comment.timestamp else None
+            }, 200
+        else:
+            return {
+                "success": True,
+                "message": "User has not rated this purchase yet",
+                "has_rating": False,
+                "is_completed": purchase.status == PurchaseStatus.COMPLETED
+            }, 200
+
+    except Exception as e:
+        print(f"Error checking purchase rating: {str(e)}")
+        return {
+            "success": False,
+            "message": "An error occurred while checking the purchase rating",
+            "error": str(e)
+        }, 500
+

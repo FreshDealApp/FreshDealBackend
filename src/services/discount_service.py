@@ -87,6 +87,6 @@ def apply_discount(purchases):
 
             # If no discount remains, exit loop
             if remaining_discount <= 0:
-                break
+                remaining_discount = Decimal('0')
 
     return total_before_discount, discount_amount, purchases_after_discount
